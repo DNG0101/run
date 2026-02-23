@@ -11,9 +11,10 @@ body{
   font-family:monospace;
   text-align:center;
 }
+
 #console{
-  width:80%;
-  height:420px;
+  width:85%;
+  height:460px;
   margin:20px auto;
   background:black;
   padding:15px;
@@ -21,12 +22,19 @@ body{
   white-space:pre-wrap;
   border-radius:8px;
   text-align:left;
+  border:2px solid #0f0;
 }
+
 button{
-  padding:10px 20px;
+  padding:10px 18px;
   margin:5px;
-  font-size:16px;
+  font-size:15px;
+  background:#222;
+  color:#0f0;
+  border:1px solid #0f0;
+  cursor:pointer;
 }
+button:hover{background:#333}
 </style>
 </head>
 
@@ -35,7 +43,7 @@ button{
 <h2>Java Cloud Console</h2>
 
 <div id="programs"></div>
-<div id="console">Type input below and press RUN.\n</div>
+<div id="console">Ready.\n</div>
 
 <script>
 
@@ -44,7 +52,7 @@ const consoleBox=document.getElementById("console");
 
 let busy=false;
 
-/* load buttons */
+/* load program buttons */
 async function loadPrograms(){
   const r=await fetch(API+"/files");
   const files=await r.json();
@@ -58,42 +66,59 @@ async function loadPrograms(){
   });
 }
 
+function write(txt){
+  consoleBox.textContent+=txt;
+  consoleBox.scrollTop=consoleBox.scrollHeight;
+}
+
 /* run program */
 async function runProgram(file){
 
   if(busy){
-    consoleBox.textContent+="\nProgram already running...\n";
+    write("\nAnother program is running...\n");
     return;
   }
 
   busy=true;
+  consoleBox.textContent="";
 
-  // collect console input
-  const input=prompt("Enter program input (multiple lines allowed):") || "";
+  const input=prompt("Enter input (multiple lines allowed):")||"";
 
-  consoleBox.textContent="Starting "+file+"...\n";
+  write("Running "+file+"\n");
 
-  await fetch(API+"/run",{
+  const r=await fetch(API+"/run",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({filename:file,input:input})
   });
 
-  let state="queued";
+  const runid=await r.text();
 
-  while(state!=="completed"){
-    await new Promise(r=>setTimeout(r,2500));
-    const s=await fetch(API+"/status");
-    state=await s.text();
-    consoleBox.textContent+="status: "+state+"\n";
+  write("Run ID: "+runid+"\nWaiting for runner...\n");
+
+  await new Promise(r=>setTimeout(r,6000));
+
+  let status="queued";
+
+  while(status!=="completed"){
+    await new Promise(r=>setTimeout(r,5000));
+    const s=await fetch(API+"/status?id="+runid);
+    status=await s.text();
+    write("status: "+status+"\n");
   }
 
-  consoleBox.textContent+="Fetching output...\n";
+  write("Fetching output...\n");
 
-  const out=await fetch(API+"/result?x="+Date.now());
-  const txt=await out.text();
+  let output="waiting...";
+  while(output==="waiting..."){
+    await new Promise(r=>setTimeout(r,3000));
+    const out=await fetch(API+"/result?id="+runid);
+    output=await out.text();
+  }
 
-  consoleBox.textContent+="\n------ OUTPUT ------\n"+txt+"\n--------------------\n";
+  write("\n----- PROGRAM OUTPUT -----\n");
+  write(output);
+  write("\n--------------------------\n");
 
   busy=false;
 }
