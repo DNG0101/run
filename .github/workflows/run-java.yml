@@ -12,33 +12,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout (FAST)
+      # 1️⃣ Get repository files
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      # Use preinstalled Java (NO installation)
-      - name: Verify Java
+      # 2️⃣ Immediately clear previous output (IMPORTANT FIX)
+      - name: Clear old output
+        run: |
+          echo "Program is running... please wait." > output.txt
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add output.txt
+          git commit -m "clear old output" || echo "no change"
+          git push
+
+      # 3️⃣ Verify Java exists (GitHub already has Java preinstalled)
+      - name: Check Java
         run: java -version
 
-      # Compile only changed file (huge speedup)
+      # 4️⃣ Compile only the selected file (faster)
       - name: Compile selected file
         run: |
           FILE="${{ github.event.client_payload.filename }}"
+          echo "Compiling $FILE"
           javac "$FILE"
 
-      - name: Run program
+      # 5️⃣ Run Java program with input from website
+      - name: Run Java program
         run: |
           FILE="${{ github.event.client_payload.filename }}"
           INPUT="${{ github.event.client_payload.input }}"
           CLASS=$(basename "$FILE" .java)
 
+          echo "Running $CLASS with input: $INPUT"
           java $CLASS $INPUT > output.txt
 
-      - name: Commit output
+      # 6️⃣ Push final output so website can read it
+      - name: Upload output
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add output.txt
-          git commit -m "output update" || echo "no change"
+          git commit -m "update program output" || echo "no change"
           git push
