@@ -2,121 +2,102 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Java Runner</title>
+<title>Java Console</title>
 
 <style>
-body{
-    font-family: Arial;
-    text-align:center;
-    margin-top:80px;
-    background:#f2f2f2;
+body{font-family:monospace;background:#111;color:#0f0;text-align:center}
+#console{
+  width:80%;
+  height:400px;
+  margin:20px auto;
+  background:black;
+  padding:15px;
+  overflow:auto;
+  border-radius:10px;
+  text-align:left;
+  white-space:pre-wrap;
 }
-button{
-    display:block;
-    margin:12px auto;
-    padding:14px 28px;
-    font-size:18px;
-    background:green;
-    color:white;
-    border:none;
-    border-radius:8px;
-    cursor:pointer;
-}
-#output{
-    width:70%;
-    margin:20px auto;
-    background:white;
-    padding:20px;
-    border-radius:10px;
-    white-space:pre-wrap;
-}
-input{
-    padding:12px;
-    width:300px;
-    font-size:16px;
-    border-radius:8px;
-    margin-bottom:20px;
-}
+button{padding:10px 20px;margin:5px;font-size:16px}
+input{padding:8px;width:300px;margin:10px}
 </style>
 </head>
 
 <body>
 
-<h1>Available Java Programs</h1>
+<h2>Online Java Console</h2>
 
-<input id="userInput" placeholder="Enter input (example: 5 10 or Nithish)">
+<input id="input" placeholder="Enter program input">
 
 <div id="programs"></div>
-<div id="status">Loading programs...</div>
-<div id="output"></div>
+
+<div id="console">Ready.</div>
 
 <script>
 
-const API = "https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
-let running = false;
+const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
+let busy=false;
 
-/* Load program buttons */
-async function loadPrograms(){
-
-    const res = await fetch(API + "/files?x=" + Date.now());
-    const files = await res.json();
-
-    const container = document.getElementById("programs");
-    const status = document.getElementById("status");
-
-    status.innerHTML = "";
-
-    files.forEach(file=>{
-        const btn = document.createElement("button");
-        btn.innerText = "Run " + file;
-        btn.onclick = ()=> runProgram(file);
-        container.appendChild(btn);
-    });
+function log(msg){
+  const c=document.getElementById("console");
+  c.textContent+= "\n"+msg;
+  c.scrollTop=c.scrollHeight;
 }
 
-/* Run selected program */
-async function runProgram(file){
+async function loadPrograms(){
+  const r=await fetch(API+"/files");
+  const files=await r.json();
 
-    if(running){
-        alert("A program is already running. Please wait.");
-        return;
-    }
+  const box=document.getElementById("programs");
 
-    running = true;
+  files.forEach(f=>{
+    const b=document.createElement("button");
+    b.textContent=f;
+    b.onclick=()=>run(f);
+    box.appendChild(b);
+  });
+}
 
-    const status = document.getElementById("status");
-    const output = document.getElementById("output");
-    const input = document.getElementById("userInput").value;
+async function run(file){
 
-    status.innerHTML = "Starting program...";
-    output.innerHTML = "";
+  if(busy){
+    log("Another program is already running...");
+    return;
+  }
 
-    await fetch(API + "/run",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ filename:file, input:input })
-    });
+  busy=true;
+  document.getElementById("console").textContent="";
 
-    let state="queued";
+  const input=document.getElementById("input").value;
 
-    while(state !== "completed"){
-        await new Promise(r=>setTimeout(r,3000));
-        const res = await fetch(API + "/status?x=" + Date.now());
-        state = await res.text();
-        status.innerHTML = "Runner status: " + state;
-    }
+  log("Starting "+file);
 
-    const out = await fetch(API + "/result?x=" + Date.now());
-    const text = await out.text();
+  await fetch(API+"/run",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({filename:file,input:input})
+  });
 
-    status.innerHTML = "Finished";
-    output.innerText = text;
+  let state="queued";
 
-    running = false;
+  while(state!=="completed"){
+    await new Promise(r=>setTimeout(r,2500));
+    const s=await fetch(API+"/status");
+    state=await s.text();
+    log("status: "+state);
+  }
+
+  log("Fetching output...");
+  const out=await fetch(API+"/result?x="+Date.now());
+  const txt=await out.text();
+
+  log("\n--- PROGRAM OUTPUT ---\n"+txt+"\n----------------------");
+
+  busy=false;
 }
 
 loadPrograms();
 
 </script>
+
 </body>
 </html>
