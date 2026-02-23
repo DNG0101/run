@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Java Remote Control</title>
+</head>
+
+<body style="text-align:center;margin-top:120px;font-family:Arial">
+
+<h1>QR Verification System</h1>
+
+<button onclick="runJava()" 
+style="padding:18px 40px;font-size:22px;background:green;color:white;border:none;border-radius:8px">
+RUN
+</button>
+
+<p id="msg"></p>
+
+<script>
+function runJava(){
+    document.getElementById("msg").innerText="Starting verification...";
+
+    fetch("https://throbbing-glitter-9b1e.donthulanithish53.workers.dev")
+    .then(res => res.text())
+    .then(data=>{
+        document.getElementById("msg").innerText="Verification Started";
+    });
+}
+</script>
+
+</body>
+</html>
