@@ -1,47 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Java Control Panel</title>
+    <title>Java Control Panel</title>
 </head>
+
 <body style="text-align:center;font-family:Arial">
 
-<h1>My Java Programs</h1>
+<h2>Available Java Programs</h2>
 
 <div id="buttons"></div>
 
 <script>
-const USER = "YOUR_USERNAME";
+
+const USER = "DNG0101";
 const REPO = "run";
+const WORKER = "https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
 
-async function loadFiles() {
+async function loadFiles(){
 
-  const res = await fetch(
-    `https://api.github.com/repos/${USER}/${REPO}/contents`
-  );
+    const response = await fetch(
+        `https://api.github.com/repos/${USER}/${REPO}/contents`
+    );
 
-  const files = await res.json();
+    const files = await response.json();
 
-  const container = document.getElementById("buttons");
+    const container = document.getElementById("buttons");
+    container.innerHTML = "";
 
-  files.forEach(file => {
+    files.forEach(file => {
 
-    if(file.name.endsWith(".java")) {
+        if(file.name.endsWith(".java")){
 
-      const btn = document.createElement("button");
-      btn.innerText = "Run " + file.name;
-      btn.style.margin="10px";
-      btn.style.padding="12px 25px";
+            const btn = document.createElement("button");
 
-      btn.onclick = () => {
-        fetch(`https://throbbing-glitter-9b1e.donthulanithish53.workers.dev/?file=${file.name}`);
-      };
+            btn.innerText = "Run " + file.name;
 
-      container.appendChild(btn);
-    }
-  });
+            btn.style.padding="15px 30px";
+            btn.style.margin="10px";
+            btn.style.fontSize="18px";
+            btn.style.background="green";
+            btn.style.color="white";
+            btn.style.border="none";
+            btn.style.borderRadius="8px";
+
+            btn.onclick = async () => {
+                btn.innerText = "Starting...";
+                await fetch(`${WORKER}/?file=${file.name}`);
+                btn.innerText = "Triggered!";
+            };
+
+            container.appendChild(btn);
+        }
+    });
 }
 
 loadFiles();
+
 </script>
 
 </body>
