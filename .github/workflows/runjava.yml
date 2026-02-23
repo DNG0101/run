@@ -23,24 +23,22 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Stop execution if no filename received
       - name: Validate filename
         run: |
           if [ -z "${{ github.event.client_payload.filename }}" ]; then
-            echo "No filename provided. Exiting safely."
+            echo "No filename received. Exiting."
             exit 0
           fi
 
-      - name: Print selected file
-        run: echo "Running file: ${{ github.event.client_payload.filename }}"
-
-      - name: Compile selected file
+      - name: Compile file
         run: |
           FILE="${{ github.event.client_payload.filename }}"
+          echo "Compiling $FILE"
           javac "$FILE"
 
-      - name: Run selected file
+      - name: Run file
         run: |
           FILE="${{ github.event.client_payload.filename }}"
           CLASS=$(basename "$FILE" .java)
+          echo "Running $CLASS"
           java "$CLASS"
