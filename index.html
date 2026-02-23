@@ -2,19 +2,19 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Java Online Console</title>
+<title>Java Cloud Terminal</title>
 
 <style>
 body{
   background:#111;
   color:#0f0;
-  font-family:monospace;
+  font-family:Consolas,monospace;
   text-align:center;
 }
 
 #console{
   width:85%;
-  height:460px;
+  height:470px;
   margin:20px auto;
   background:black;
   padding:15px;
@@ -23,6 +23,7 @@ body{
   border-radius:8px;
   text-align:left;
   border:2px solid #0f0;
+  outline:none;
 }
 
 button{
@@ -40,19 +41,26 @@ button:hover{background:#333}
 
 <body>
 
-<h2>Java Cloud Console</h2>
+<h2>Java Cloud Terminal</h2>
 
 <div id="programs"></div>
-<div id="console">Ready.\n</div>
+<div id="console" tabindex="0"></div>
 
 <script>
 
 const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
-const consoleBox=document.getElementById("console");
+const term=document.getElementById("console");
 
 let busy=false;
+let selectedProgram=null;
+let inputBuffer="";
 
-/* load program buttons */
+function write(t){
+  term.textContent+=t;
+  term.scrollTop=term.scrollHeight;
+}
+
+/* load buttons */
 async function loadPrograms(){
   const r=await fetch(API+"/files");
   const files=await r.json();
@@ -61,67 +69,86 @@ async function loadPrograms(){
   files.forEach(f=>{
     const b=document.createElement("button");
     b.textContent=f;
-    b.onclick=()=>runProgram(f);
+    b.onclick=()=>{
+      selectedProgram=f;
+      term.textContent="";
+      write("Selected: "+f+"\n");
+      write("Type input and press ENTER to run\n\n> ");
+      term.focus();
+    };
     box.appendChild(b);
   });
 }
 
-function write(txt){
-  consoleBox.textContent+=txt;
-  consoleBox.scrollTop=consoleBox.scrollHeight;
-}
+/* keyboard typing */
+term.addEventListener("keydown",async(e)=>{
 
-/* run program */
-async function runProgram(file){
+  if(!selectedProgram || busy) return;
 
-  if(busy){
-    write("\nAnother program is running...\n");
+  // ENTER pressed → run program
+  if(e.key==="Enter"){
+    e.preventDefault();
+
+    write("\nRunning...\n");
+
+    busy=true;
+
+    const r=await fetch(API+"/run",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        filename:selectedProgram,
+        input:inputBuffer
+      })
+    });
+
+    const runid=await r.text();
+
+    await new Promise(r=>setTimeout(r,6000));
+
+    let status="queued";
+
+    while(status!=="completed"){
+      await new Promise(r=>setTimeout(r,5000));
+      const s=await fetch(API+"/status?id="+runid);
+      status=await s.text();
+      write("status: "+status+"\n");
+    }
+
+    write("\n--- OUTPUT ---\n");
+
+    let output="waiting...";
+    while(output==="waiting..."){
+      await new Promise(r=>setTimeout(r,3000));
+      const out=await fetch(API+"/result?id="+runid);
+      output=await out.text();
+    }
+
+    write(output+"\n");
+    write("\n> ");
+
+    inputBuffer="";
+    busy=false;
     return;
   }
 
-  busy=true;
-  consoleBox.textContent="";
-
-  const input=prompt("Enter input (multiple lines allowed):")||"";
-
-  write("Running "+file+"\n");
-
-  const r=await fetch(API+"/run",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({filename:file,input:input})
-  });
-
-  const runid=await r.text();
-
-  write("Run ID: "+runid+"\nWaiting for runner...\n");
-
-  await new Promise(r=>setTimeout(r,6000));
-
-  let status="queued";
-
-  while(status!=="completed"){
-    await new Promise(r=>setTimeout(r,5000));
-    const s=await fetch(API+"/status?id="+runid);
-    status=await s.text();
-    write("status: "+status+"\n");
+  // BACKSPACE
+  if(e.key==="Backspace"){
+    e.preventDefault();
+    if(inputBuffer.length>0){
+      inputBuffer=inputBuffer.slice(0,-1);
+      term.textContent=term.textContent.slice(0,-1);
+    }
+    return;
   }
 
-  write("Fetching output...\n");
-
-  let output="waiting...";
-  while(output==="waiting..."){
-    await new Promise(r=>setTimeout(r,3000));
-    const out=await fetch(API+"/result?id="+runid);
-    output=await out.text();
+  // normal typing
+  if(e.key.length===1){
+    inputBuffer+=e.key;
+    write(e.key);
   }
 
-  write("\n----- PROGRAM OUTPUT -----\n");
-  write(output);
-  write("\n--------------------------\n");
-
-  busy=false;
-}
+});
 
 loadPrograms();
 
