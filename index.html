@@ -1,54 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>My Java Programs</title>
+<title>Java Runner</title>
 
 <style>
 body{
-    font-family: Arial, Helvetica, sans-serif;
-    background: #f2f2f2;
-    text-align: center;
-    margin: 0;
+    font-family: Arial;
+    text-align:center;
+    margin-top:80px;
+    background:#f2f2f2;
 }
-
 h1{
-    margin-top: 40px;
-    font-size: 36px;
+    margin-bottom:40px;
 }
-
-#programs{
-    margin-top: 40px;
+button{
+    display:block;
+    margin:15px auto;
+    padding:14px 28px;
+    font-size:18px;
+    background:green;
+    color:white;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
 }
-
-.runBtn{
-    background: #1a8f2d;
-    color: white;
-    border: none;
-    padding: 14px 26px;
-    margin: 12px;
-    font-size: 18px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: 0.2s;
+button:hover{
+    background:#0a7a0a;
 }
-
-.runBtn:hover{
-    background: #0f6d22;
-}
-
-.runBtn:disabled{
-    background: gray;
-    cursor: not-allowed;
-}
-
 #status{
-    margin-top: 30px;
-    font-size: 20px;
-    font-weight: bold;
-    color: #333;
+    margin-top:20px;
+    font-size:18px;
 }
 </style>
 </head>
@@ -57,98 +39,67 @@ h1{
 
 <h1>Available Java Programs</h1>
 
-<div id="programs">
-Loading programs...
-</div>
-
-<div id="status"></div>
-
+<div id="programs"></div>
+<div id="status">Loading programs...</div>
 
 <script>
 
-const WORKER = "https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
+const API = "https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
 
-/* ---------- LOAD JAVA FILE LIST ---------- */
-async function loadPrograms(){
+async function loadPrograms() {
+    try {
 
-    const container = document.getElementById("programs");
-    container.innerHTML = "Fetching files from repository...";
+        const res = await fetch(API + "/files", {
+            method: "GET",
+            mode: "cors",
+            cache: "no-store",
+            headers: {
+                "Accept": "application/json"
+            },
+            referrerPolicy: "no-referrer"
+        });
 
-    try{
-        const res = await fetch(WORKER + "/files");
         const files = await res.json();
 
-        container.innerHTML = "";
+        const container = document.getElementById("programs");
+        const status = document.getElementById("status");
+
+        status.innerHTML = "";
 
         if(files.length === 0){
-            container.innerHTML = "No Java files found in repository.";
+            status.innerHTML = "No Java files found.";
             return;
         }
 
         files.forEach(file => {
-
             const btn = document.createElement("button");
-            btn.className = "runBtn";
             btn.innerText = "Run " + file;
 
-            btn.onclick = () => runProgram(file, btn);
+            btn.onclick = async () => {
+                status.innerHTML = "Starting " + file + "...";
+
+                await fetch(API + "/run", {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ filename: file }),
+                    referrerPolicy: "no-referrer"
+                });
+
+                status.innerHTML = file + " started. Check GitHub Actions.";
+            };
 
             container.appendChild(btn);
         });
 
-    }catch(err){
-        container.innerHTML = "Failed to load programs.";
-        console.error(err);
+    } catch (e) {
+        document.getElementById("status").innerHTML =
+            "Failed to load programs.";
     }
 }
 
-
-/* ---------- RUN SELECTED JAVA PROGRAM ---------- */
-async function runProgram(filename, button){
-
-    const status = document.getElementById("status");
-
-    // Disable all buttons
-    document.querySelectorAll(".runBtn").forEach(b => b.disabled = true);
-
-    button.innerText = "Starting...";
-    status.innerText = "Sending request to server...";
-
-    try{
-
-        const response = await fetch(WORKER + "/run", {
-            method: "POST",
-            headers:{
-                "Content-Type":"application/json"
-            },
-            body: JSON.stringify({
-                filename: filename
-            })
-        });
-
-        const text = await response.text();
-
-        status.innerText = "Program execution started: " + filename;
-
-        button.innerText = "Running...";
-
-        // Re-enable buttons after few seconds
-        setTimeout(()=>{
-            document.querySelectorAll(".runBtn").forEach(b => {
-                b.disabled = false;
-                b.innerText = "Run " + b.innerText.replace("Running... ","").replace("Run ","");
-            });
-            status.innerText = "You can run another program.";
-        }, 8000);
-
-    }catch(e){
-        status.innerText = "Error starting program.";
-        console.error(e);
-    }
-}
-
-
-/* ---------- INITIAL LOAD ---------- */
 loadPrograms();
 
 </script>
