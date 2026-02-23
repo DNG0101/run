@@ -42,7 +42,6 @@ button:hover{background:#333}
 <body>
 
 <h2>Java Cloud Terminal</h2>
-
 <div id="programs"></div>
 <div id="console" tabindex="0"></div>
 
@@ -61,7 +60,6 @@ function write(t){
   term.scrollTop=term.scrollHeight;
 }
 
-/* load buttons */
 async function loadPrograms(){
   const r=await fetch(API+"/files");
   const files=await r.json();
@@ -74,19 +72,17 @@ async function loadPrograms(){
       selectedProgram=f;
       term.textContent="";
       write("Selected: "+f+"\n");
-      write("Type input. SHIFT+ENTER = next line\nPress ENTER to run\n\n> ");
+      write("SHIFT+ENTER = next line\nENTER = run\n\n> ");
       term.focus();
     };
     box.appendChild(b);
   });
 }
 
-/* keyboard terminal */
 term.addEventListener("keydown",async(e)=>{
 
   if(!selectedProgram || busy) return;
 
-  // SHIFT+ENTER → new line
   if(e.key==="Enter" && e.shiftKey){
     e.preventDefault();
     lines.push(inputBuffer);
@@ -95,7 +91,6 @@ term.addEventListener("keydown",async(e)=>{
     return;
   }
 
-  // ENTER → run program
   if(e.key==="Enter"){
     e.preventDefault();
 
@@ -138,10 +133,8 @@ term.addEventListener("keydown",async(e)=>{
     inputBuffer="";
     lines=[];
     busy=false;
-    return;
   }
 
-  // backspace
   if(e.key==="Backspace"){
     e.preventDefault();
     if(inputBuffer.length>0){
@@ -151,12 +144,10 @@ term.addEventListener("keydown",async(e)=>{
     return;
   }
 
-  // normal typing
   if(e.key.length===1){
     inputBuffer+=e.key;
     write(e.key);
   }
-
 });
 
 loadPrograms();
