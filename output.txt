@@ -1,1 +1,1 @@
-The difference between 20 and 5 is: 15
+Please type your name in the textbox.
