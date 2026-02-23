@@ -6,7 +6,6 @@ permissions:
 on:
   repository_dispatch:
     types: [run-java]
-  workflow_dispatch:
 
 jobs:
   run:
@@ -16,11 +15,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: temurin
-          java-version: 17
+      - name: Check Java version
+        run: java -version
 
       - name: Compile all Java files
         run: javac *.java
@@ -31,10 +27,10 @@ jobs:
           CLASS=$(basename "$FILE" .java)
           java "$CLASS" > output.txt
 
-      - name: Commit output to repo
+      - name: Commit output
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add output.txt
-          git commit -m "Update program output" || echo "No changes"
+          git commit -m "Update output" || echo "No change"
           git push
