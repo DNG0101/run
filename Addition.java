@@ -1,13 +1,18 @@
 public class Addition {
     public static void main(String[] args) {
-        // Declare and initialize two integer variables
-        int number1 = 10;
-        int number2 = 20;
 
-        // Add the two numbers and store the result in a third variable
-        int sum = number1 + number2;
+        if(args.length < 2){
+            System.out.println("Please provide two numbers.");
+            return;
+        }
 
-        // Print the result to the console
-        System.out.println("The sum of " + number1 + " and " + number2 + " is " + sum);
+        int a = Integer.parseInt(args[0]);
+        int b = Integer.parseInt(args[1]);
+
+        int sum = a + b;
+
+        System.out.println("First Number: " + a);
+        System.out.println("Second Number: " + b);
+        System.out.println("Sum = " + sum);
     }
 }
