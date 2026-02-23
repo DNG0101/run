@@ -50,13 +50,16 @@ const term=document.getElementById("console");
 
 let busy=false;
 let selectedProgram=null;
-let input="";
+
+let currentLine="";
+let lines=[];
 
 function write(t){
   term.textContent+=t;
   term.scrollTop=term.scrollHeight;
 }
 
+/* load available .java files */
 async function loadPrograms(){
   const r=await fetch(API+"/files");
   const files=await r.json();
@@ -68,34 +71,34 @@ async function loadPrograms(){
     b.onclick=()=>{
       selectedProgram=f;
       term.textContent="";
-      write("Selected: "+f+"\nType input and press ENTER\n\n> ");
+      write("Selected: "+f+"\n");
+      write("SHIFT+ENTER → next input line\nENTER → run program\n\n> ");
       term.focus();
     };
     box.appendChild(b);
   });
 }
 
-let lines=[];
-
+/* terminal keyboard */
 term.addEventListener("keydown",async(e)=>{
 
   if(!selectedProgram || busy) return;
 
-  // SHIFT+ENTER → add next input line
+  /* SHIFT+ENTER → new input line */
   if(e.key==="Enter" && e.shiftKey){
     e.preventDefault();
-    lines.push(input);
+    lines.push(currentLine);
     write("\n> ");
-    input="";
+    currentLine="";
     return;
   }
 
-  // ENTER → run program
+  /* ENTER → run program */
   if(e.key==="Enter"){
     e.preventDefault();
 
-    lines.push(input);
-    const fullInput = lines.join("\n");
+    lines.push(currentLine);
+    const fullInput=lines.join("\n");
 
     write("\nRunning...\n");
     busy=true;
@@ -111,6 +114,7 @@ term.addEventListener("keydown",async(e)=>{
 
     const runid=await r.text();
 
+    /* wait for runner */
     let status="queued";
     while(status!=="completed"){
       await new Promise(r=>setTimeout(r,5000));
@@ -119,6 +123,7 @@ term.addEventListener("keydown",async(e)=>{
       write("status: "+status+"\n");
     }
 
+    /* wait for output file */
     write("\nFetching output...\n");
 
     let output="waiting...";
@@ -129,73 +134,27 @@ term.addEventListener("keydown",async(e)=>{
     }
 
     write("\n--- OUTPUT ---\n");
-    write(output+"\n> ");
+    write(output+"\n\n> ");
 
-    input="";
+    currentLine="";
     lines=[];
     busy=false;
     return;
   }
 
+  /* BACKSPACE */
   if(e.key==="Backspace"){
-    input=input.slice(0,-1);
-    term.textContent=term.textContent.slice(0,-1);
-    return;
-  }
-
-  if(e.key.length===1){
-    input+=e.key;
-    write(e.key);
-  }
-});
-  if(!selectedProgram || busy) return;
-
-  if(e.key==="Enter"){
     e.preventDefault();
-
-    write("\nRunning...\n");
-    busy=true;
-
-    const r=await fetch(API+"/run",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({filename:selectedProgram,input:input})
-    });
-
-    const runid=await r.text();
-
-    let status="queued";
-    while(status!=="completed"){
-      await new Promise(r=>setTimeout(r,5000));
-      const s=await fetch(API+"/status?id="+runid);
-      status=await s.text();
-      write("status: "+status+"\n");
+    if(currentLine.length>0){
+      currentLine=currentLine.slice(0,-1);
+      term.textContent=term.textContent.slice(0,-1);
     }
-
-    write("\n--- OUTPUT ---\n");
-
-    let output="waiting...";
-    while(output==="waiting..."){
-      await new Promise(r=>setTimeout(r,3000));
-      const out=await fetch(API+"/result?id="+runid);
-      output=await out.text();
-    }
-
-    write(output+"\n> ");
-
-    input="";
-    busy=false;
     return;
   }
 
-  if(e.key==="Backspace"){
-    input=input.slice(0,-1);
-    term.textContent=term.textContent.slice(0,-1);
-    return;
-  }
-
+  /* normal typing */
   if(e.key.length===1){
-    input+=e.key;
+    currentLine+=e.key;
     write(e.key);
   }
 });
