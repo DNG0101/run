@@ -14,17 +14,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Download your repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 2. Install Java
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Compile
-        run: javac Main.java
+      # 3. Show which file was requested (for debugging)
+      - name: Print selected file
+        run: echo "File received: ${{ github.event.client_payload.filename }}"
 
-      - name: Execute
-        run: java Main
+      # 4. Compile the requested java file
+      - name: Compile selected file
+        run: |
+          FILE="${{ github.event.client_payload.filename }}"
+          javac "$FILE"
+
+      # 5. Extract class name (remove .java)
+      - name: Run selected file
+        run: |
+          FILE="${{ github.event.client_payload.filename }}"
+          CLASS=$(basename "$FILE" .java)
+          echo "Running class: $CLASS"
+          java "$CLASS"
