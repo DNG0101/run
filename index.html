@@ -40,45 +40,71 @@ pre{
 
 <script>
 
-const API = "https://throbbing-glitter-9b1e.donthulanithish53.workers.dev/";
+const API = "https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
 
 async function loadPrograms(){
 
-    const res = await fetch(API + "/files");
-    const files = await res.json();
-
-    const container = document.getElementById("programs");
     const status = document.getElementById("status");
+    const container = document.getElementById("programs");
 
-    status.innerHTML = "";
+    try{
 
-    files.forEach(file => {
+        const res = await fetch(API + "/files", {
+            method: "GET",
+            mode: "cors",
+            cache: "no-store",
+            headers: {
+                "Accept": "application/json"
+            }
+        });
 
-        const btn = document.createElement("button");
-        btn.innerText = "Run " + file;
+        if(!res.ok){
+            status.innerHTML = "Server not responding (" + res.status + ")";
+            return;
+        }
 
-        btn.onclick = async () => {
+        const files = await res.json();
 
-            status.innerHTML = "Running " + file + "... please wait";
+        status.innerHTML = "";
 
-            await fetch(API + "/run", {
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body: JSON.stringify({ filename:file })
-            });
+        if(files.length === 0){
+            status.innerHTML = "No Java programs found in repository.";
+            return;
+        }
 
-            // wait for GitHub runner
-            await new Promise(r => setTimeout(r, 18000));
+        files.forEach(file => {
 
-            const out = await fetch(API + "/result");
-            const text = await out.text();
+            const btn = document.createElement("button");
+            btn.innerText = "Run " + file;
 
-            status.innerHTML =
-                "<h3>Program Output:</h3><pre>"+text+"</pre>";
-        };
+            btn.onclick = async () => {
 
-        container.appendChild(btn);
-    });
+                status.innerHTML = "Running " + file + " ... (15-25 seconds)";
+
+                await fetch(API + "/run", {
+                    method:"POST",
+                    mode:"cors",
+                    headers:{"Content-Type":"application/json"},
+                    body: JSON.stringify({ filename:file })
+                });
+
+                await new Promise(r => setTimeout(r, 20000));
+
+                const out = await fetch(API + "/result", { cache:"no-store" });
+                const text = await out.text();
+
+                status.innerHTML =
+                    "<h3>Program Output:</h3><pre>"+text+"</pre>";
+            };
+
+            container.appendChild(btn);
+        });
+
+    }
+    catch(err){
+        status.innerHTML = "Cannot connect to Worker API";
+        console.error(err);
+    }
 }
 
 loadPrograms();
