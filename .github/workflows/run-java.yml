@@ -1,4 +1,4 @@
-name: Run Java From Website
+name: Java Console Runner
 
 on:
   repository_dispatch:
@@ -7,9 +7,8 @@ on:
 permissions:
   contents: write
 
-# IMPORTANT: only one execution at a time
 concurrency:
-  group: java-runner
+  group: java-console
   cancel-in-progress: false
 
 jobs:
@@ -17,37 +16,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      # Clear previous output immediately
-      - name: Clear old output
+      # write input from website into stdin.txt
+      - name: Prepare input
         run: |
-          echo "Program is running... please wait." > output.txt
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add output.txt
-          git commit -m "clear output" || echo "no change"
-          git push
+          echo "${{ github.event.client_payload.input }}" > stdin.txt
 
-      # Compile only requested file
-      - name: Compile
+      # compile selected file
+      - name: Compile program
         run: |
           FILE="${{ github.event.client_payload.filename }}"
           javac "$FILE"
 
-      # Run Java with user input
-      - name: Run Program
+      # run program reading from stdin
+      - name: Run program
         run: |
           FILE="${{ github.event.client_payload.filename }}"
-          INPUT="${{ github.event.client_payload.input }}"
           CLASS=$(basename "$FILE" .java)
+          java $CLASS < stdin.txt > output.txt
 
-          java $CLASS $INPUT > output.txt
-
-      # Upload final output
+      # push output so website can read it
       - name: Upload output
         run: |
           git config user.name "github-actions"
