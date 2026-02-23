@@ -11,6 +11,11 @@ body{
     margin-top:80px;
     background:#f2f2f2;
 }
+
+h1{
+    margin-bottom:40px;
+}
+
 button{
     display:block;
     margin:15px auto;
@@ -22,12 +27,26 @@ button{
     border-radius:8px;
     cursor:pointer;
 }
+
+button:hover{
+    background:#0a7a0a;
+}
+
+#status{
+    margin-top:25px;
+    font-size:18px;
+}
+
 pre{
     background:white;
-    padding:15px;
-    width:60%;
-    margin:auto;
-    border-radius:8px;
+    padding:18px;
+    width:65%;
+    margin:20px auto;
+    border-radius:10px;
+    text-align:left;
+    box-shadow:0 0 10px rgba(0,0,0,0.15);
+    white-space:pre-wrap;
+    word-wrap:break-word;
 }
 </style>
 </head>
@@ -35,6 +54,7 @@ pre{
 <body>
 
 <h1>Available Java Programs</h1>
+
 <div id="programs"></div>
 <div id="status">Loading programs...</div>
 
@@ -53,18 +73,17 @@ async function loadPrograms(){
             method: "GET",
             mode: "cors",
             cache: "no-store",
-            headers: {
-                "Accept": "application/json"
-            }
+            headers: { "Accept": "application/json" }
         });
 
         if(!res.ok){
-            status.innerHTML = "Server not responding (" + res.status + ")";
+            status.innerHTML = "Worker not responding (" + res.status + ")";
             return;
         }
 
         const files = await res.json();
 
+        container.innerHTML = "";
         status.innerHTML = "";
 
         if(files.length === 0){
@@ -79,8 +98,13 @@ async function loadPrograms(){
 
             btn.onclick = async () => {
 
-                status.innerHTML = "Running " + file + " ... (15-25 seconds)";
+                status.innerHTML = "Preparing to run " + file + "...";
 
+                /* get old output */
+                const oldRes = await fetch(API + "/result?cache=" + Date.now(), {cache:"no-store"});
+                const oldOutput = await oldRes.text();
+
+                /* start GitHub Action */
                 await fetch(API + "/run", {
                     method:"POST",
                     mode:"cors",
@@ -88,20 +112,31 @@ async function loadPrograms(){
                     body: JSON.stringify({ filename:file })
                 });
 
-                await new Promise(r => setTimeout(r, 20000));
+                status.innerHTML = "Running " + file + " on GitHub runner... please wait";
 
-                const out = await fetch(API + "/result", { cache:"no-store" });
-                const text = await out.text();
+                let newOutput = oldOutput;
+
+                /* wait until output changes */
+                for(let i=0;i<24;i++){   // up to 2 minutes
+
+                    await new Promise(r => setTimeout(r, 5000));
+
+                    const res = await fetch(API + "/result?cache=" + Date.now(), {cache:"no-store"});
+                    newOutput = await res.text();
+
+                    if(newOutput !== oldOutput){
+                        break;
+                    }
+                }
 
                 status.innerHTML =
-                    "<h3>Program Output:</h3><pre>"+text+"</pre>";
+                    "<h3>Program Output:</h3><pre>"+newOutput+"</pre>";
             };
 
             container.appendChild(btn);
         });
 
-    }
-    catch(err){
+    }catch(err){
         status.innerHTML = "Cannot connect to Worker API";
         console.error(err);
     }
@@ -110,5 +145,6 @@ async function loadPrograms(){
 loadPrograms();
 
 </script>
+
 </body>
 </html>
