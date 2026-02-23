@@ -1,0 +1,25 @@
+name: Run Java From Button
+
+on:
+  repository_dispatch:
+    types: [run-java]
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Compile Java
+        run: javac Main.java
+
+      - name: Run Java Program
+        run: java Main
