@@ -1,30 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Java Remote Control</title>
+  <title>Java Control Panel</title>
 </head>
+<body style="text-align:center;font-family:Arial">
 
-<body style="text-align:center;margin-top:120px;font-family:Arial">
+<h1>My Java Programs</h1>
 
-<h1>QR Verification System</h1>
-
-<button onclick="runJava()" 
-style="padding:18px 40px;font-size:22px;background:green;color:white;border:none;border-radius:8px">
-RUN
-</button>
-
-<p id="msg"></p>
+<div id="buttons"></div>
 
 <script>
-function runJava(){
-    document.getElementById("msg").innerText="Starting verification...";
+const USER = "YOUR_USERNAME";
+const REPO = "run";
 
-    fetch("https://throbbing-glitter-9b1e.donthulanithish53.workers.dev")
-    .then(res => res.text())
-    .then(data=>{
-        document.getElementById("msg").innerText="Verification Started";
-    });
+async function loadFiles() {
+
+  const res = await fetch(
+    `https://api.github.com/repos/${USER}/${REPO}/contents`
+  );
+
+  const files = await res.json();
+
+  const container = document.getElementById("buttons");
+
+  files.forEach(file => {
+
+    if(file.name.endsWith(".java")) {
+
+      const btn = document.createElement("button");
+      btn.innerText = "Run " + file.name;
+      btn.style.margin="10px";
+      btn.style.padding="12px 25px";
+
+      btn.onclick = () => {
+        fetch(`https://throbbing-glitter-9b1e.donthulanithish53.workers.dev/?file=${file.name}`);
+      };
+
+      container.appendChild(btn);
+    }
+  });
 }
+
+loadFiles();
 </script>
 
 </body>
