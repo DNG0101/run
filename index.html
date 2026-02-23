@@ -105,11 +105,16 @@ async function loadPrograms(){
                 const oldOutput = await oldRes.text();
 
                 /* start GitHub Action */
+                // read textbox
+                const userInput = document.getElementById("userInput").value;
+
                 await fetch(API + "/run", {
-                    method:"POST",
-                    mode:"cors",
-                    headers:{"Content-Type":"application/json"},
-                    body: JSON.stringify({ filename:file })
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                filename: file,
+                input: userInput
+                })
                 });
 
                 status.innerHTML = "Running " + file + " on GitHub runner... please wait";
