@@ -11,9 +11,6 @@ body{
     margin-top:80px;
     background:#f2f2f2;
 }
-h1{
-    margin-bottom:40px;
-}
 button{
     display:block;
     margin:15px auto;
@@ -25,12 +22,12 @@ button{
     border-radius:8px;
     cursor:pointer;
 }
-button:hover{
-    background:#0a7a0a;
-}
-#status{
-    margin-top:20px;
-    font-size:18px;
+pre{
+    background:white;
+    padding:15px;
+    width:60%;
+    margin:auto;
+    border-radius:8px;
 }
 </style>
 </head>
@@ -38,71 +35,54 @@ button:hover{
 <body>
 
 <h1>Available Java Programs</h1>
-
 <div id="programs"></div>
 <div id="status">Loading programs...</div>
 
 <script>
 
-const API = "https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
+const API = "https://YOUR-WORKER-URL.workers.dev";
 
-async function loadPrograms() {
-    try {
+async function loadPrograms(){
 
-        const res = await fetch(API + "/files", {
-            method: "GET",
-            mode: "cors",
-            cache: "no-store",
-            headers: {
-                "Accept": "application/json"
-            },
-            referrerPolicy: "no-referrer"
-        });
+    const res = await fetch(API + "/files");
+    const files = await res.json();
 
-        const files = await res.json();
+    const container = document.getElementById("programs");
+    const status = document.getElementById("status");
 
-        const container = document.getElementById("programs");
-        const status = document.getElementById("status");
+    status.innerHTML = "";
 
-        status.innerHTML = "";
+    files.forEach(file => {
 
-        if(files.length === 0){
-            status.innerHTML = "No Java files found.";
-            return;
-        }
+        const btn = document.createElement("button");
+        btn.innerText = "Run " + file;
 
-        files.forEach(file => {
-            const btn = document.createElement("button");
-            btn.innerText = "Run " + file;
+        btn.onclick = async () => {
 
-            btn.onclick = async () => {
-                status.innerHTML = "Starting " + file + "...";
+            status.innerHTML = "Running " + file + "... please wait";
 
-                await fetch(API + "/run", {
-                    method: "POST",
-                    mode: "cors",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ filename: file }),
-                    referrerPolicy: "no-referrer"
-                });
+            await fetch(API + "/run", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({ filename:file })
+            });
 
-                status.innerHTML = file + " started. Check GitHub Actions.";
-            };
+            // wait for GitHub runner
+            await new Promise(r => setTimeout(r, 18000));
 
-            container.appendChild(btn);
-        });
+            const out = await fetch(API + "/result");
+            const text = await out.text();
 
-    } catch (e) {
-        document.getElementById("status").innerHTML =
-            "Failed to load programs.";
-    }
+            status.innerHTML =
+                "<h3>Program Output:</h3><pre>"+text+"</pre>";
+        };
+
+        container.appendChild(btn);
+    });
 }
 
 loadPrograms();
 
 </script>
-
 </body>
 </html>
