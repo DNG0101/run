@@ -1,0 +1,43 @@
+name: Java Console Runner
+
+on:
+  repository_dispatch:
+    types: [run-java]
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Prepare input
+        run: |
+          echo "${{ github.event.client_payload.input }}" > stdin.txt
+
+      - name: Compile all Java
+        run: |
+          javac -encoding UTF-8 $(find . -name "*.java")
+
+      - name: Run program
+        run: |
+          FILE="${{ github.event.client_payload.filename }}"
+          CLASS=$(basename "$FILE" .java)
+          RUNID=${{ github.run_id }}
+
+          java -cp . $CLASS < stdin.txt > output_$RUNID.txt 2>&1
+
+      - name: Upload output
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add output_${{ github.run_id }}.txt
+          git commit -m "output ${{ github.run_id }}" || echo "no change"
+          git push
