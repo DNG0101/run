@@ -2,74 +2,76 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Java Console</title>
+<title>Java Online Console</title>
 
 <style>
-body{font-family:monospace;background:#111;color:#0f0;text-align:center}
+body{
+  background:#111;
+  color:#0f0;
+  font-family:monospace;
+  text-align:center;
+}
 #console{
   width:80%;
-  height:400px;
+  height:420px;
   margin:20px auto;
   background:black;
   padding:15px;
   overflow:auto;
-  border-radius:10px;
-  text-align:left;
   white-space:pre-wrap;
+  border-radius:8px;
+  text-align:left;
 }
-button{padding:10px 20px;margin:5px;font-size:16px}
-input{padding:8px;width:300px;margin:10px}
+button{
+  padding:10px 20px;
+  margin:5px;
+  font-size:16px;
+}
 </style>
 </head>
 
 <body>
 
-<h2>Online Java Console</h2>
-
-<input id="input" placeholder="Enter program input">
+<h2>Java Cloud Console</h2>
 
 <div id="programs"></div>
-
-<div id="console">Ready.</div>
+<div id="console">Type input below and press RUN.\n</div>
 
 <script>
 
 const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
+const consoleBox=document.getElementById("console");
+
 let busy=false;
 
-function log(msg){
-  const c=document.getElementById("console");
-  c.textContent+= "\n"+msg;
-  c.scrollTop=c.scrollHeight;
-}
-
+/* load buttons */
 async function loadPrograms(){
   const r=await fetch(API+"/files");
   const files=await r.json();
-
   const box=document.getElementById("programs");
 
   files.forEach(f=>{
     const b=document.createElement("button");
     b.textContent=f;
-    b.onclick=()=>run(f);
+    b.onclick=()=>runProgram(f);
     box.appendChild(b);
   });
 }
 
-async function run(file){
+/* run program */
+async function runProgram(file){
 
   if(busy){
-    log("Another program is already running...");
+    consoleBox.textContent+="\nProgram already running...\n";
     return;
   }
 
   busy=true;
-  document.getElementById("console").textContent="";
 
-  const input=document.getElementById("input").value;
+  // collect console input
+  const input=prompt("Enter program input (multiple lines allowed):") || "";
 
-  log("Starting "+file);
+  consoleBox.textContent="Starting "+file+"...\n";
 
   await fetch(API+"/run",{
     method:"POST",
@@ -83,14 +85,15 @@ async function run(file){
     await new Promise(r=>setTimeout(r,2500));
     const s=await fetch(API+"/status");
     state=await s.text();
-    log("status: "+state);
+    consoleBox.textContent+="status: "+state+"\n";
   }
 
-  log("Fetching output...");
+  consoleBox.textContent+="Fetching output...\n";
+
   const out=await fetch(API+"/result?x="+Date.now());
   const txt=await out.text();
 
-  log("\n--- PROGRAM OUTPUT ---\n"+txt+"\n----------------------");
+  consoleBox.textContent+="\n------ OUTPUT ------\n"+txt+"\n--------------------\n";
 
   busy=false;
 }
@@ -98,6 +101,5 @@ async function run(file){
 loadPrograms();
 
 </script>
-
 </body>
 </html>
