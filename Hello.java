@@ -1,16 +1,13 @@
-public class Hello {
+import java.util.*;
 
+public class Hello {
     public static void main(String[] args) {
 
-        if (args.length == 0) {
-            System.out.println("Please type your name in the textbox.");
-            return;
-        }
+        Scanner sc = new Scanner(System.in);
 
-        String name = args[0];
+        System.out.print("Enter your name: ");
+        String name = sc.nextLine();
 
-        System.out.println("Program: Hello.java");
-        System.out.println("Hello, " + name + "!");
-        System.out.println("Welcome to the Cloud Java Runner.");
+        System.out.println("Hello " + name);
     }
 }
