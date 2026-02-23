@@ -1,1 +1,1 @@
-Invalid input. Please enter only numbers.
+Program is running... please wait.
