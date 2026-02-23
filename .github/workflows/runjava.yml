@@ -3,6 +3,7 @@ name: Run Java From Website
 on:
   repository_dispatch:
     types: [run-java]
+  workflow_dispatch:
 
 jobs:
   run:
