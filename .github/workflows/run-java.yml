@@ -1,37 +1,37 @@
 name: Run Java From Website
 
-permissions:
-  contents: write
-  actions: write
-
 on:
   repository_dispatch:
     types: [run-java]
+
+permissions:
+  contents: write
 
 jobs:
   run:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout (FAST)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: Show payload (debug)
+      # Use preinstalled Java (NO installation)
+      - name: Verify Java
+        run: java -version
+
+      # Compile only changed file (huge speedup)
+      - name: Compile selected file
         run: |
-          echo "Filename: ${{ github.event.client_payload.filename }}"
-          echo "Input: ${{ github.event.client_payload.input }}"
+          FILE="${{ github.event.client_payload.filename }}"
+          javac "$FILE"
 
-      - name: Compile Java files
-        run: javac *.java
-
-      - name: Run Java program
+      - name: Run program
         run: |
           FILE="${{ github.event.client_payload.filename }}"
           INPUT="${{ github.event.client_payload.input }}"
           CLASS=$(basename "$FILE" .java)
-
-          echo "Running: $CLASS"
-          echo "Input: $INPUT"
 
           java $CLASS $INPUT > output.txt
 
@@ -40,5 +40,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add output.txt
-          git commit -m "Update output" || echo "No change"
+          git commit -m "output update" || echo "no change"
           git push
