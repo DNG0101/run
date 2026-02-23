@@ -1,6 +1,7 @@
 name: Java Console Runner
 
 on:
+  workflow_dispatch:
   repository_dispatch:
     types: [run-java]
 
