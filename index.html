@@ -1,93 +1,25 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Java Cloud Terminal</title>
+let lines=[];
 
-<style>
-body{
-  background:#111;
-  color:#0f0;
-  font-family:Consolas,monospace;
-  text-align:center;
-}
-
-#console{
-  width:85%;
-  height:470px;
-  margin:20px auto;
-  background:black;
-  padding:15px;
-  overflow:auto;
-  white-space:pre-wrap;
-  border-radius:8px;
-  text-align:left;
-  border:2px solid #0f0;
-  outline:none;
-}
-
-button{
-  padding:10px 18px;
-  margin:5px;
-  font-size:15px;
-  background:#222;
-  color:#0f0;
-  border:1px solid #0f0;
-  cursor:pointer;
-}
-button:hover{background:#333}
-</style>
-</head>
-
-<body>
-
-<h2>Java Cloud Terminal</h2>
-
-<div id="programs"></div>
-<div id="console" tabindex="0"></div>
-
-<script>
-
-const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
-const term=document.getElementById("console");
-
-let busy=false;
-let selectedProgram=null;
-let inputBuffer="";
-
-function write(t){
-  term.textContent+=t;
-  term.scrollTop=term.scrollHeight;
-}
-
-/* load buttons */
-async function loadPrograms(){
-  const r=await fetch(API+"/files");
-  const files=await r.json();
-  const box=document.getElementById("programs");
-
-  files.forEach(f=>{
-    const b=document.createElement("button");
-    b.textContent=f;
-    b.onclick=()=>{
-      selectedProgram=f;
-      term.textContent="";
-      write("Selected: "+f+"\n");
-      write("Type input and press ENTER to run\n\n> ");
-      term.focus();
-    };
-    box.appendChild(b);
-  });
-}
-
-/* keyboard typing */
 term.addEventListener("keydown",async(e)=>{
 
   if(!selectedProgram || busy) return;
 
-  // ENTER pressed → run program
+  // SHIFT+ENTER = new line input
+  if(e.key==="Enter" && e.shiftKey){
+    e.preventDefault();
+    lines.push(inputBuffer);
+    write("\n");
+    inputBuffer="";
+    return;
+  }
+
+  // ENTER = run
   if(e.key==="Enter"){
     e.preventDefault();
+
+    lines.push(inputBuffer);
+
+    const fullInput=lines.join("\n");
 
     write("\nRunning...\n");
 
@@ -98,7 +30,7 @@ term.addEventListener("keydown",async(e)=>{
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         filename:selectedProgram,
-        input:inputBuffer
+        input:fullInput
       })
     });
 
@@ -107,7 +39,6 @@ term.addEventListener("keydown",async(e)=>{
     await new Promise(r=>setTimeout(r,6000));
 
     let status="queued";
-
     while(status!=="completed"){
       await new Promise(r=>setTimeout(r,5000));
       const s=await fetch(API+"/status?id="+runid);
@@ -128,11 +59,11 @@ term.addEventListener("keydown",async(e)=>{
     write("\n> ");
 
     inputBuffer="";
+    lines=[];
     busy=false;
     return;
   }
 
-  // BACKSPACE
   if(e.key==="Backspace"){
     e.preventDefault();
     if(inputBuffer.length>0){
@@ -142,16 +73,9 @@ term.addEventListener("keydown",async(e)=>{
     return;
   }
 
-  // normal typing
   if(e.key.length===1){
     inputBuffer+=e.key;
     write(e.key);
   }
 
 });
-
-loadPrograms();
-
-</script>
-</body>
-</html>
