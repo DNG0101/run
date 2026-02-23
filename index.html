@@ -91,9 +91,45 @@ async function loadPrograms(){
             return;
         }
 
-        files.forEach(file => {
+btn.onclick = async () => {
 
-            const btn = document.createElement("button");
+    const inputBox = document.getElementById("userInput");
+    const userInput = inputBox ? inputBox.value : "";
+
+    status.innerHTML = "Preparing to run " + file + "...";
+
+    // IMPORTANT: send JSON body
+    await fetch(API + "/run", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            filename: file,
+            input: userInput
+        })
+    });
+
+    // now start checking runner
+    let state = "queued";
+
+    while (state !== "completed") {
+
+        await new Promise(r => setTimeout(r, 4000));
+
+        const res = await fetch(API + "/status?x=" + Date.now());
+        state = await res.text();
+
+        status.innerHTML = "Runner status: " + state;
+    }
+
+    // fetch output
+    const out = await fetch(API + "/result?x=" + Date.now());
+    const text = await out.text();
+
+    status.innerHTML =
+        "<h3>Program Output:</h3><pre>" + text + "</pre>";
+};
             btn.innerText = "Run " + file;
 
             btn.onclick = async () => {
