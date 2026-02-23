@@ -75,7 +75,79 @@ async function loadPrograms(){
   });
 }
 
+let lines=[];
+
 term.addEventListener("keydown",async(e)=>{
+
+  if(!selectedProgram || busy) return;
+
+  // SHIFT+ENTER → add next input line
+  if(e.key==="Enter" && e.shiftKey){
+    e.preventDefault();
+    lines.push(input);
+    write("\n> ");
+    input="";
+    return;
+  }
+
+  // ENTER → run program
+  if(e.key==="Enter"){
+    e.preventDefault();
+
+    lines.push(input);
+    const fullInput = lines.join("\n");
+
+    write("\nRunning...\n");
+    busy=true;
+
+    const r=await fetch(API+"/run",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        filename:selectedProgram,
+        input:fullInput
+      })
+    });
+
+    const runid=await r.text();
+
+    let status="queued";
+    while(status!=="completed"){
+      await new Promise(r=>setTimeout(r,5000));
+      const s=await fetch(API+"/status?id="+runid);
+      status=await s.text();
+      write("status: "+status+"\n");
+    }
+
+    write("\nFetching output...\n");
+
+    let output="waiting...";
+    while(output==="waiting..."){
+      await new Promise(r=>setTimeout(r,3000));
+      const out=await fetch(API+"/result?id="+runid);
+      output=await out.text();
+    }
+
+    write("\n--- OUTPUT ---\n");
+    write(output+"\n> ");
+
+    input="";
+    lines=[];
+    busy=false;
+    return;
+  }
+
+  if(e.key==="Backspace"){
+    input=input.slice(0,-1);
+    term.textContent=term.textContent.slice(0,-1);
+    return;
+  }
+
+  if(e.key.length===1){
+    input+=e.key;
+    write(e.key);
+  }
+});
   if(!selectedProgram || busy) return;
 
   if(e.key==="Enter"){
