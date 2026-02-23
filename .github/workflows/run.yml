@@ -2,8 +2,15 @@ name: Java Console Runner
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [run-java]
+    inputs:
+      filename:
+        description: "Java file to run"
+        required: true
+        type: string
+      input:
+        description: "Program input"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -13,23 +20,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           persist-credentials: true
           fetch-depth: 0
 
-      - name: Prepare input
+      - name: Create input file
         run: |
-          echo "${{ github.event.client_payload.input }}" > stdin.txt
+          echo "${{ github.event.inputs.input }}" > stdin.txt
 
-      - name: Compile all Java
+      - name: Compile Java programs
         run: |
           javac -encoding UTF-8 $(find . -name "*.java")
 
-      - name: Run program
+      - name: Execute program
         run: |
-          FILE="${{ github.event.client_payload.filename }}"
+          FILE="${{ github.event.inputs.filename }}"
           CLASS=$(basename "$FILE" .java)
           RUNID=${{ github.run_id }}
 
@@ -40,5 +47,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add output_${{ github.run_id }}.txt
-          git commit -m "output ${{ github.run_id }}" || echo "no change"
+          git commit -m "output ${{ github.run_id }}" || echo "no changes"
           git push
