@@ -1,1 +1,3 @@
-Program is running... please wait.
+Program: Hello.java
+Hello, hey!
+Welcome to the Cloud Java Runner.
