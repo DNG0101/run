@@ -1,38 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>My Java Programs</title>
+
+<style>
+body{
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f2f2f2;
+    text-align: center;
+    margin: 0;
+}
+
+h1{
+    margin-top: 40px;
+    font-size: 36px;
+}
+
+#programs{
+    margin-top: 40px;
+}
+
+.runBtn{
+    background: #1a8f2d;
+    color: white;
+    border: none;
+    padding: 14px 26px;
+    margin: 12px;
+    font-size: 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.runBtn:hover{
+    background: #0f6d22;
+}
+
+.runBtn:disabled{
+    background: gray;
+    cursor: not-allowed;
+}
+
+#status{
+    margin-top: 30px;
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Available Java Programs</h1>
+
+<div id="programs">
+Loading programs...
+</div>
+
+<div id="status"></div>
+
+
 <script>
 
 const WORKER = "https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
 
-async function loadFiles(){
+/* ---------- LOAD JAVA FILE LIST ---------- */
+async function loadPrograms(){
 
-    const response = await fetch(WORKER);
-    const files = await response.json();
+    const container = document.getElementById("programs");
+    container.innerHTML = "Fetching files from repository...";
 
-    const container = document.getElementById("buttons");
-    container.innerHTML = "";
+    try{
+        const res = await fetch(WORKER + "/files");
+        const files = await res.json();
 
-    files.forEach(name => {
+        container.innerHTML = "";
 
-        const btn = document.createElement("button");
+        if(files.length === 0){
+            container.innerHTML = "No Java files found in repository.";
+            return;
+        }
 
-        btn.innerText = "Run " + name;
-        btn.style.padding="15px 30px";
-        btn.style.margin="10px";
-        btn.style.fontSize="18px";
-        btn.style.background="green";
-        btn.style.color="white";
-        btn.style.border="none";
-        btn.style.borderRadius="8px";
+        files.forEach(file => {
 
-        btn.onclick = async () => {
-            btn.innerText = "Starting...";
-            await fetch(`${WORKER}/?file=${name}`);
-            btn.innerText = "Triggered!";
-        };
+            const btn = document.createElement("button");
+            btn.className = "runBtn";
+            btn.innerText = "Run " + file;
 
-        container.appendChild(btn);
-    });
+            btn.onclick = () => runProgram(file, btn);
+
+            container.appendChild(btn);
+        });
+
+    }catch(err){
+        container.innerHTML = "Failed to load programs.";
+        console.error(err);
+    }
 }
 
-loadFiles();
+
+/* ---------- RUN SELECTED JAVA PROGRAM ---------- */
+async function runProgram(filename, button){
+
+    const status = document.getElementById("status");
+
+    // Disable all buttons
+    document.querySelectorAll(".runBtn").forEach(b => b.disabled = true);
+
+    button.innerText = "Starting...";
+    status.innerText = "Sending request to server...";
+
+    try{
+
+        const response = await fetch(WORKER + "/run", {
+            method: "POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body: JSON.stringify({
+                filename: filename
+            })
+        });
+
+        const text = await response.text();
+
+        status.innerText = "Program execution started: " + filename;
+
+        button.innerText = "Running...";
+
+        // Re-enable buttons after few seconds
+        setTimeout(()=>{
+            document.querySelectorAll(".runBtn").forEach(b => {
+                b.disabled = false;
+                b.innerText = "Run " + b.innerText.replace("Running... ","").replace("Run ","");
+            });
+            status.innerText = "You can run another program.";
+        }, 8000);
+
+    }catch(e){
+        status.innerText = "Error starting program.";
+        console.error(e);
+    }
+}
+
+
+/* ---------- INITIAL LOAD ---------- */
+loadPrograms();
 
 </script>
+
+</body>
+</html>
