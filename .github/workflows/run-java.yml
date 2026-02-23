@@ -1,0 +1,40 @@
+name: Run Java From Website
+
+permissions:
+  contents: write
+
+on:
+  repository_dispatch:
+    types: [run-java]
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Compile all Java files
+        run: javac *.java
+
+      - name: Run selected file and capture output
+        run: |
+          FILE="${{ github.event.client_payload.filename }}"
+          CLASS=$(basename "$FILE" .java)
+          java "$CLASS" > output.txt
+
+      - name: Commit output to repo
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add output.txt
+          git commit -m "Update program output" || echo "No changes"
+          git push
