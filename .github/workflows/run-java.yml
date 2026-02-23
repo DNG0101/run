@@ -2,6 +2,7 @@ name: Run Java From Website
 
 permissions:
   contents: write
+  actions: write
 
 on:
   repository_dispatch:
@@ -15,17 +16,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Check Java version
-        run: java -version
+      - name: Show payload (debug)
+        run: |
+          echo "Filename: ${{ github.event.client_payload.filename }}"
+          echo "Input: ${{ github.event.client_payload.input }}"
 
-      - name: Compile all Java files
+      - name: Compile Java files
         run: javac *.java
 
-      - name: Run selected file and capture output
+      - name: Run Java program
         run: |
           FILE="${{ github.event.client_payload.filename }}"
+          INPUT="${{ github.event.client_payload.input }}"
           CLASS=$(basename "$FILE" .java)
-          java "$CLASS" > output.txt
+
+          echo "Running: $CLASS"
+          echo "Input: $INPUT"
+
+          java $CLASS $INPUT > output.txt
 
       - name: Commit output
         run: |
