@@ -7,33 +7,24 @@
 <style>
 body{
   margin:0;
-  background:#0c0c0c;
-  color:#00ff9c;
+  background:#0b0f0b;
+  color:#00ffa2;
   font-family:Consolas,monospace;
 }
 
-/* Layout */
 #layout{
   display:flex;
   height:100vh;
 }
 
-/* LEFT PANEL (CODE VIEW) */
 #left{
   width:50%;
-  border-right:2px solid #00ff9c;
+  border-right:2px solid #00ffa2;
   padding:12px;
   box-sizing:border-box;
   overflow:auto;
 }
 
-#code{
-  white-space:pre;
-  color:#00eaff;
-  font-size:14px;
-}
-
-/* RIGHT PANEL */
 #right{
   width:50%;
   display:flex;
@@ -41,187 +32,148 @@ body{
 }
 
 #programs{
-  border-bottom:2px solid #00ff9c;
   padding:10px;
+  border-bottom:2px solid #00ffa2;
 }
 
-/* Buttons */
+#code{
+  white-space:pre;
+  color:#00eaff;
+}
+
 button{
-  padding:7px 14px;
+  padding:6px 14px;
   margin:4px;
-  background:#101010;
-  color:#00ff9c;
-  border:1px solid #00ff9c;
+  background:#111;
+  color:#00ffa2;
+  border:1px solid #00ffa2;
   cursor:pointer;
 }
-button:hover{
-  background:#1c1c1c;
-}
+button:hover{background:#1c1c1c}
 
-/* Terminal */
 #term{
   flex:1;
+  padding:12px;
   background:black;
-  padding:14px;
   overflow:auto;
   white-space:pre-wrap;
-  outline:none;
 }
-
-/* Cursor effect */
-.cursor::after{
-  content:"█";
-  animation:blink 1s infinite;
-}
-@keyframes blink{50%{opacity:0}}
 </style>
 </head>
 
 <body>
 
 <div id="layout">
-
-  <!-- LEFT SIDE -->
   <div id="left">
     <h3>Java Source</h3>
     <pre id="code">Connecting to server...</pre>
   </div>
 
-  <!-- RIGHT SIDE -->
   <div id="right">
     <div id="programs"></div>
-    <div id="term" tabindex="0"></div>
+    <div id="term"></div>
   </div>
-
 </div>
 
 <script>
 
-/* CHANGE ONLY IF WORKER URL CHANGES */
 const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
-
 const term=document.getElementById("term");
 const code=document.getElementById("code");
-const programBox=document.getElementById("programs");
+const programs=document.getElementById("programs");
 
-/* terminal output */
-function write(text){
-  term.textContent+=text;
+function write(t){
+  term.textContent+=t;
   term.scrollTop=term.scrollHeight;
 }
 
-/* detect Scanner inputs automatically */
 function detectInputs(src){
-  const matches=src.match(/next(Int|Line|Double|Float|Long|Short|Byte)\s*\(/g);
-  return matches?matches.length:0;
+  const m=src.match(/next(Int|Line|Double|Float|Long|Short|Byte)\s*\(/g);
+  return m?m.length:0;
 }
 
-/* load program list */
 async function loadPrograms(){
-
-  try{
-    const r=await fetch(API+"/files");
-
-    if(!r.ok){
-      code.textContent="Cannot connect to worker server.";
-      return;
-    }
-
-    const files=await r.json();
-
-    programBox.innerHTML="";
-
-    files.forEach(file=>{
-      const btn=document.createElement("button");
-      btn.textContent=file;
-      btn.onclick=()=>runProgram(file);
-      programBox.appendChild(btn);
-    });
-
-    code.textContent="Select a program from the right panel.";
+  const r=await fetch(API+"/files");
+  if(!r.ok){
+    code.textContent="Worker unreachable.";
+    return;
   }
-  catch(e){
-    code.textContent="Worker server offline.";
-  }
+
+  const files=await r.json();
+  programs.innerHTML="";
+
+  files.forEach(f=>{
+    const b=document.createElement("button");
+    b.textContent=f;
+    b.onclick=()=>runProgram(f);
+    programs.appendChild(b);
+  });
+
+  code.textContent="Select a program from the right.";
 }
 
-/* run a selected java program */
 async function runProgram(file){
 
   term.textContent="";
   write("Fetching code...\n");
 
-  /* get code */
   const r=await fetch(API+"/code?file="+encodeURIComponent(file));
   const src=await r.text();
-
   code.textContent=src;
 
-  /* collect inputs */
   const inputCount=detectInputs(src);
   let inputs=[];
 
   for(let i=1;i<=inputCount;i++){
-    const val=prompt("Enter input "+i+":") ?? "";
-    inputs.push(val);
+    inputs.push(prompt("Enter input "+i+":") || "");
   }
-
-  const fullInput=inputs.join("\n");
 
   write("Starting execution...\n");
 
-  /* start runner */
-  const run=await fetch(API+"/run",{
+  const start=await fetch(API+"/run",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
       filename:file,
-      input:fullInput
+      input:inputs.join("\n")
     })
   });
 
-  const runid=await run.text();
+  const runid=await start.text();
   write("Run ID: "+runid+"\n");
 
-  /* status polling */
-  let finished=false;
-
-  while(!finished){
-
+  /* wait for runner */
+  let done=false;
+  while(!done){
     await new Promise(r=>setTimeout(r,4000));
-
     const s=await fetch(API+"/status?id="+runid);
     const js=await s.json();
 
     write("status: "+js.status+"\n");
 
     if(js.conclusion==="failure"){
-      write("\nProgram failed (compile/runtime error)\n");
+      write("\nProgram failed.\n");
       return;
     }
 
     if(js.status==="completed")
-      finished=true;
+      done=true;
   }
 
-  /* fetch output */
   write("\nFetching output...\n");
 
   let output="waiting";
-
   while(output==="waiting"){
     await new Promise(r=>setTimeout(r,3000));
     const out=await fetch(API+"/result?id="+runid);
     output=await out.text();
   }
 
-  write("\n----- OUTPUT -----\n");
+  write("\n------ OUTPUT ------\n");
   write(output+"\n");
 }
 
-/* start page */
 loadPrograms();
-
 </script>
 </body>
 </html>
