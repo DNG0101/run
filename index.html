@@ -160,14 +160,33 @@ async function loadPrograms(){
 
       /* AUTO INPUT DETECTION */
       const totalInputs=countInputs(code);
-      let collected=[];
+/* extract real prompts from java code */
+const prompts = extractPrompts(code);
+let collected=[];
 
-      if(totalInputs>0){
-        for(let i=1;i<=totalInputs;i++){
-          const val=prompt("Enter input value "+i+":");
-          collected.push(val??"");
-        }
-      }
+if(prompts.length>0){
+
+  for(let p of prompts){
+
+    // remove trailing spaces
+    let clean=p.trim();
+
+    // show real message
+    const val = prompt(clean);
+    collected.push(val ?? "");
+  }
+
+}
+else{
+  // fallback if no print statements
+  const totalInputs=countInputs(code);
+  for(let i=1;i<=totalInputs;i++){
+    const val=prompt("Enter input value "+i+":");
+    collected.push(val??"");
+  }
+}
+
+lines=collected;
 
       lines=collected;
 
