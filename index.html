@@ -6,122 +6,77 @@
 
 <style>
 body{
-  background:#111;
-  color:#0f0;
-  font-family:Consolas,monospace;
   margin:0;
+  background:#0c0c0c;
+  color:#00ff9c;
+  font-family:Consolas,monospace;
 }
 
-/* layout */
-#container{
+#layout{
   display:flex;
   height:100vh;
 }
 
-/* LEFT PANEL */
-#codePanel{
+/* LEFT */
+#left{
   width:50%;
-  border-right:2px solid #0f0;
-  padding:15px;
+  border-right:2px solid #00ff9c;
+  padding:12px;
   box-sizing:border-box;
-  overflow:auto;
-  background:#0b0b0b;
 }
 
-#codePanel h3{
-  margin-top:0;
-  color:#00ffaa;
-}
-
-/* code viewer */
 #code{
   white-space:pre;
-  text-align:left;
+  height:90%;
+  overflow:auto;
   color:#00eaff;
 }
 
-/* editor */
-#editor{
-  display:none;
-  width:100%;
-  height:85%;
-  background:#0b0b0b;
-  color:#00eaff;
-  border:2px solid #0f0;
-  resize:none;
-  outline:none;
-  padding:12px;
-  font-family:Consolas,monospace;
-  font-size:14px;
-  line-height:1.4;
-}
-
-/* RIGHT PANEL */
-#rightPanel{
+/* RIGHT */
+#right{
   width:50%;
   display:flex;
   flex-direction:column;
 }
 
 #programs{
+  border-bottom:2px solid #00ff9c;
   padding:10px;
-  border-bottom:2px solid #0f0;
 }
 
-/* buttons */
 button{
-  padding:8px 14px;
+  padding:6px 12px;
   margin:4px;
-  font-size:14px;
-  background:#222;
-  color:#0f0;
-  border:1px solid #0f0;
+  background:#111;
+  color:#00ff9c;
+  border:1px solid #00ff9c;
   cursor:pointer;
 }
-button:hover{background:#333}
+button:hover{background:#1c1c1c}
 
 /* terminal */
-#console{
+#term{
   flex:1;
-  padding:15px;
   background:black;
+  padding:12px;
   overflow:auto;
   white-space:pre-wrap;
-  outline:none;
 }
-
-/* blinking cursor */
-.cursor::after{
-  content:"█";
-  animation:blink 1s infinite;
-}
-@keyframes blink{50%{opacity:0;}}
 </style>
 </head>
 
 <body>
 
-<div id="container">
+<div id="layout">
 
-  <!-- LEFT -->
-  <div id="codePanel">
-    <h3>Program Code / Editor</h3>
-
-    <div>
-      <button onclick="enableEditor()">✏ Write Code</button>
-      <button onclick="runTypedCode()">▶ Run Written Code</button>
-      <button onclick="clearConsole()">🧹 Clear Console</button>
-      <button onclick="downloadOutput()">⬇ Download Output</button>
-    </div>
-
-    <textarea id="editor"></textarea>
-    <pre id="code">Select a program...</pre>
+  <div id="left">
+    <h3>Java Source</h3>
+    <pre id="code">Loading programs...</pre>
   </div>
 
-  <!-- RIGHT -->
-  <div id="rightPanel">
+  <div id="right">
     <div id="programs"></div>
-    <div id="console" tabindex="0"></div>
+    <div id="term" tabindex="0"></div>
   </div>
 
 </div>
@@ -130,256 +85,99 @@ button:hover{background:#333}
 
 const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
 
-const term=document.getElementById("console");
-const codeBox=document.getElementById("code");
-const editor=document.getElementById("editor");
+const term=document.getElementById("term");
+const code=document.getElementById("code");
 
-let busy=false;
-let selectedProgram=null;
-let lastPrompts=[];
-
-let currentLine="";
-let lines=[];
-
-/* terminal output */
 function write(t){
   term.textContent+=t;
   term.scrollTop=term.scrollHeight;
 }
 
-/* detect inputs */
-function countInputs(code){
-  const patterns=["nextInt(","nextLine(","nextDouble(","nextFloat(","next(","nextLong("];
-  let count=0;
-  patterns.forEach(p=>count+=code.split(p).length-1);
-  return count;
-}
-
-/* extract prompts */
-function extractPrompts(code){
-  const prompts=[];
-  const regex=/System\.out\.print(?:ln)?\s*\(\s*"(.*?)"\s*\)/g;
-  let match;
-  while((match=regex.exec(code))!==null){
-    prompts.push(match[1]);
-  }
-  return prompts;
-}
-
-/* remove prompts from output */
-function cleanOutput(output,prompts){
-  let cleaned=output;
-  for(let p of prompts){
-    const escaped=p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    const regex=new RegExp(escaped,"g");
-    cleaned=cleaned.replace(regex,"");
-  }
-  return cleaned.trim();
-}
-
-/* load .java files */
 async function loadPrograms(){
 
   const r=await fetch(API+"/files");
+  if(!r.ok){
+    code.textContent="Server unreachable";
+    return;
+  }
+
   const files=await r.json();
   const box=document.getElementById("programs");
+  box.innerHTML="";
 
   files.forEach(f=>{
     const b=document.createElement("button");
     b.textContent=f;
 
-    b.onclick=async ()=>{
-      selectedProgram=f;
-      editor.style.display="none";
-      codeBox.style.display="block";
-
-      const r2=await fetch(API+"/code?file="+f);
-      const code=await r2.text();
-      codeBox.textContent=code;
-
-      const prompts=extractPrompts(code);
-      lastPrompts=prompts;
-
-      let collected=[];
-
-      if(prompts.length>0){
-        for(let p of prompts){
-          const val=prompt(p.trim());
-          collected.push(val??"");
-        }
-      }else{
-        const total=countInputs(code);
-        for(let i=1;i<=total;i++){
-          const val=prompt("Enter input value "+i+":");
-          collected.push(val??"");
-        }
-      }
-
-      lines=collected;
-
-      term.textContent="";
-      write("Selected: "+f+"\nInputs captured. Press ENTER to run.\n\n> ");
-      term.focus();
-    };
-
+    b.onclick=()=>runProgram(f);
     box.appendChild(b);
   });
+
+  code.textContent="Select a program to view and run.";
 }
 
-/* terminal keyboard execution (existing system) */
-term.addEventListener("keydown",async(e)=>{
-
-  if(!selectedProgram || busy) return;
-
-  if(e.key==="Enter" && e.shiftKey){
-    e.preventDefault();
-    lines.push(currentLine);
-    write("\n> ");
-    currentLine="";
-    return;
-  }
-
-  if(e.key==="Enter"){
-    e.preventDefault();
-
-    lines.push(currentLine);
-    const fullInput=lines.join("\n");
-
-    write("\nRunning...\n");
-    busy=true;
-
-    const r=await fetch(API+"/run",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({filename:selectedProgram,input:fullInput})
-    });
-
-    const runid=await r.text();
-
-    let status="queued";
-    while(status!=="completed"){
-      await new Promise(r=>setTimeout(r,5000));
-      const s=await fetch(API+"/status?id="+runid);
-      status=await s.text();
-      write("status: "+status+"\n");
-    }
-
-    write("\nFetching output...\n");
-
-    let output="waiting...";
-    while(output==="waiting..."){
-      await new Promise(r=>setTimeout(r,3000));
-      const out=await fetch(API+"/result?id="+runid);
-      output=await out.text();
-    }
-
-    output=cleanOutput(output,lastPrompts);
-
-    write("\n----- PROGRAM OUTPUT -----\n");
-    write(output+"\n\n> ");
-
-    currentLine="";
-    lines=[];
-    busy=false;
-  }
-
-  if(e.key==="Backspace"){
-    e.preventDefault();
-    if(currentLine.length>0){
-      currentLine=currentLine.slice(0,-1);
-      term.textContent=term.textContent.slice(0,-1);
-    }
-    return;
-  }
-
-  if(e.key.length===1){
-    currentLine+=e.key;
-    write(e.key);
-  }
-});
-
-/* enable custom code editor */
-function enableEditor(){
-  codeBox.style.display="none";
-  editor.style.display="block";
-
-  if(!editor.value.trim()){
-    editor.value=
-`import java.util.*;
-
-public class Main {
-    public static void main(String[] args){
-
-        Scanner sc=new Scanner(System.in);
-
-        System.out.print("Enter number: ");
-        int n=sc.nextInt();
-
-        System.out.println("Square = "+(n*n));
-    }
-}`;
-  }
-}
-
-/* run written code */
-async function runTypedCode(){
-
-  if(busy) return;
-
-  const code=editor.value;
-  if(!code.trim()){
-    alert("Write Java code first");
-    return;
-  }
-
-  const input=prompt("Enter input (use \\n for multiple lines):")||"";
+async function runProgram(file){
 
   term.textContent="";
-  write("Running custom code...\n");
-  busy=true;
+  write("Fetching code...\n");
 
-  const r=await fetch(API+"/run",{
+  const r=await fetch(API+"/code?file="+file);
+  const src=await r.text();
+  code.textContent=src;
+
+  /* collect inputs automatically */
+  const inputCount=(src.match(/next(Int|Line|Double|Float|Long|)/g)||[]).length;
+
+  let inputs=[];
+  for(let i=1;i<=inputCount;i++){
+    const val=prompt("Input "+i+":")||"";
+    inputs.push(val);
+  }
+
+  const fullInput=inputs.join("\n");
+
+  write("Starting execution...\n");
+
+  const run=await fetch(API+"/run",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({code:code,input:input,custom:true})
+    body:JSON.stringify({filename:file,input:fullInput})
   });
 
-  const runid=await r.text();
+  const runid=await run.text();
+  write("Run ID: "+runid+"\n");
 
-  let status="queued";
-  while(status!=="completed"){
-    await new Promise(r=>setTimeout(r,5000));
+  /* status polling */
+  let completed=false;
+
+  while(!completed){
+    await new Promise(r=>setTimeout(r,4000));
+
     const s=await fetch(API+"/status?id="+runid);
-    status=await s.text();
-    write("status: "+status+"\n");
+    const js=await s.json();
+
+    write("status: "+js.status+"\n");
+
+    if(js.conclusion==="failure"){
+      write("Program failed (compile/runtime error)\n");
+      return;
+    }
+
+    if(js.status==="completed")
+      completed=true;
   }
 
   write("\nFetching output...\n");
 
-  let output="waiting...";
-  while(output==="waiting..."){
+  let output="waiting";
+  while(output==="waiting"){
     await new Promise(r=>setTimeout(r,3000));
     const out=await fetch(API+"/result?id="+runid);
     output=await out.text();
   }
 
-  write("\n----- PROGRAM OUTPUT -----\n");
-  write(output+"\n> ");
-
-  busy=false;
-}
-
-/* utilities */
-function clearConsole(){
-  term.textContent="";
-}
-
-function downloadOutput(){
-  const blob=new Blob([term.textContent],{type:"text/plain"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="output.txt";
-  a.click();
+  write("\n----- OUTPUT -----\n");
+  write(output+"\n");
 }
 
 loadPrograms();
