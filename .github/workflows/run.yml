@@ -4,13 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       filename:
-        description: "Existing Java file"
         required: false
       code:
-        description: "Typed Java code"
         required: false
       input:
-        description: "Program input"
         required: false
 
 permissions:
@@ -21,21 +18,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
-      # 1️⃣ Checkout repository
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2️⃣ If custom code is sent from browser, create Main.java
-      - name: Create file from typed code
+      - name: Create file if custom code
         if: ${{ github.event.inputs.code != '' }}
         run: |
           printf "%s" "${{ github.event.inputs.code }}" > Main.java
 
-      # 3️⃣ Decide which file to run
-      - name: Select Java file
+      - name: Select file
         run: |
           if [ "${{ github.event.inputs.filename }}" != "" ]; then
             echo "FILE=${{ github.event.inputs.filename }}" >> $GITHUB_ENV
@@ -43,44 +35,36 @@ jobs:
             echo "FILE=Main.java" >> $GITHUB_ENV
           fi
 
-      # 4️⃣ Prepare input (very important for Scanner.nextLine)
-      - name: Prepare stdin
+      - name: Prepare input
         run: |
           echo -e "${{ github.event.inputs.input }}" > stdin.txt
 
-      # 5️⃣ Compile all java files (supports multiple classes)
-      - name: Compile Java
+      - name: Compile
         run: |
           javac *.java 2> compile_error.txt || true
 
-      # 6️⃣ If compilation fails, store error as output
-      - name: Handle compile error
+      - name: If compile error
         run: |
           if [ -s compile_error.txt ]; then
             cp compile_error.txt output_${{ github.run_id }}.txt
-            echo "RUN:${{ github.run_id }}" >> output_${{ github.run_id }}.txt
             exit 0
           fi
 
-      # 7️⃣ Detect actual public class name (FIXES your error)
       - name: Detect main class
         run: |
           CLASS=$(grep -h -oP 'public\s+class\s+\K[A-Za-z0-9_]+' *.java | head -n 1)
-          echo "Detected class: $CLASS"
           echo "CLASS=$CLASS" >> $GITHUB_ENV
 
-      # 8️⃣ Run the Java program safely
       - name: Run program
         run: |
           touch output_${{ github.run_id }}.txt
-          timeout 25 java -cp . $CLASS < stdin.txt >> output_${{ github.run_id }}.txt 2>&1 || echo "Runtime error or timeout" >> output_${{ github.run_id }}.txt
-          echo "RUN:${{ github.run_id }}" >> output_${{ github.run_id }}.txt
+          timeout 25 java -cp . $CLASS < stdin.txt >> output_${{ github.run_id }}.txt 2>&1 || echo "Runtime error" >> output_${{ github.run_id }}.txt
 
-      # 9️⃣ Upload output back to repo
-      - name: Upload output
+      - name: Push output
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+          echo "RUN:${{ github.run_id }}" >> output_${{ github.run_id }}.txt
           git add output_${{ github.run_id }}.txt
           git commit -m "run-${{ github.run_id }}"
-          git push origin HEAD:main
+          git push
