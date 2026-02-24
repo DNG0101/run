@@ -3,9 +3,12 @@ name: Java Runner
 on:
   workflow_dispatch:
     inputs:
+      filename:
+        description: "Existing Java file"
+        required: false
       code:
-        description: "Java source code"
-        required: true
+        description: "Typed Java code"
+        required: false
       input:
         description: "Program input"
         required: false
@@ -18,28 +21,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           persist-credentials: true
           fetch-depth: 0
 
-      # Create Java file dynamically from browser
-      - name: Create Main.java
+      # If browser sends custom code -> create Main.java
+      - name: Create file from typed code
+        if: ${{ github.event.inputs.code != '' }}
         run: |
           printf "%s" "${{ github.event.inputs.code }}" > Main.java
 
-      # Create stdin
-      - name: Prepare input
+      # If a repo file is selected
+      - name: Set filename
         run: |
-          printf "%s" "${{ github.event.inputs.input }}" > stdin.txt
+          if [ "${{ github.event.inputs.filename }}" != "" ]; then
+            echo "FILE=${{ github.event.inputs.filename }}" >> $GITHUB_ENV
+          else
+            echo "FILE=Main.java" >> $GITHUB_ENV
+          fi
 
-      # Compile
-      - name: Compile program
+      # input
+      - name: Prepare stdin
         run: |
-          javac Main.java 2> compile_error.txt || true
+          printf "%b" "${{ github.event.inputs.input }}" > stdin.txt
 
-      # If compile error -> return error
+      # compile
+      - name: Compile
+        run: |
+          javac "$FILE" 2> compile_error.txt || true
+
+      # compile error handling
       - name: Handle compile error
         run: |
           if [ -s compile_error.txt ]; then
@@ -47,12 +60,18 @@ jobs:
             exit 0
           fi
 
-      # Run program
-      - name: Run program
+      # get classname
+      - name: Detect class
         run: |
-          java Main < stdin.txt > output_${{ github.run_id }}.txt 2>&1
+          CLASS=$(basename "$FILE" .java)
+          echo "CLASS=$CLASS" >> $GITHUB_ENV
 
-      # Push output so website can read it
+      # run
+      - name: Run
+        run: |
+          timeout 25 java $CLASS < stdin.txt > output_${{ github.run_id }}.txt 2>&1 || echo "Program terminated" >> output_${{ github.run_id }}.txt
+
+      # upload output
       - name: Upload output
         run: |
           git config user.name "github-actions"
