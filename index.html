@@ -227,6 +227,25 @@ term.addEventListener("keydown",async(e)=>{
 });
 
 loadPrograms();
+  function countInputs(code){
+  const patterns = [
+    "nextInt(",
+    "nextLine(",
+    "nextDouble(",
+    "nextFloat(",
+    "next(",
+    "nextLong("
+  ];
+
+  let count=0;
+
+  patterns.forEach(p=>{
+    const matches = code.split(p).length-1;
+    count+=matches;
+  });
+
+  return count;
+}
 
 </script>
 </body>
