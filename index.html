@@ -120,7 +120,35 @@ async function loadPrograms(){
     const b=document.createElement("button");
     b.textContent=f;
 
-    b.onclick=async ()=>{
+   b.onclick=async ()=>{
+
+  selectedProgram=f;
+
+  // load code
+  const r2=await fetch(API+"/code?file="+f);
+  const code=await r2.text();
+  codeBox.textContent=code;
+
+  // detect required inputs
+  const totalInputs = countInputs(code);
+
+  let collected=[];
+
+  if(totalInputs>0){
+    for(let i=1;i<=totalInputs;i++){
+      const val = prompt("Enter input value "+i+":");
+      collected.push(val ?? "");
+    }
+  }
+
+  // prepare staged input
+  lines = collected;
+
+  term.textContent="";
+  write("Selected: "+f+"\n");
+  write("Inputs captured. Press ENTER to run.\n\n> ");
+  term.focus();
+};
       selectedProgram=f;
 
       /* load code */
