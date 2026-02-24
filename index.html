@@ -87,11 +87,18 @@ function write(t){
   term.scrollTop=term.scrollHeight;
 }
 
-function detectInputs(src){
-  const m=src.match(/next(Int|Line|Double|Float|Long|Short|Byte)\s*\(/g);
-  return m?m.length:0;
-}
+function extractPrompts(code){
 
+  const prompts=[];
+  const regex=/System\.out\.print(?:ln)?\s*\(\s*"(.*?)"\s*\)/g;
+
+  let match;
+  while((match=regex.exec(code))!==null){
+    prompts.push(match[1]);
+  }
+
+  return prompts;
+}
 async function loadPrograms(){
   const r=await fetch(API+"/files");
   if(!r.ok){
@@ -121,12 +128,29 @@ async function runProgram(file){
   const src=await r.text();
   code.textContent=src;
 
-  const inputCount=detectInputs(src);
-  let inputs=[];
+let inputs=[];
+const prompts=extractPrompts(src);
 
-  for(let i=1;i<=inputCount;i++){
-    inputs.push(prompt("Enter input "+i+":") || "");
+/* If program contains prompts, use them */
+if(prompts.length>0){
+
+  for(const p of prompts){
+    const val=prompt(p.trim()) ?? "";
+    inputs.push(val);
   }
+
+}
+/* If program has Scanner but no prints */
+else{
+
+  const matches = src.match(/next(Int|Line|Double|Float|Long|Short|Byte)\s*\(/g);
+  const count = matches ? matches.length : 0;
+
+  for(let i=1;i<=count;i++){
+    const val=prompt("Enter input "+i+":") ?? "";
+    inputs.push(val);
+  }
+}
 
   write("Starting execution...\n");
 
