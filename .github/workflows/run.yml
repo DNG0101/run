@@ -1,16 +1,14 @@
-name: Java Console Runner
+name: Java Runner
 
 on:
   workflow_dispatch:
     inputs:
-      filename:
-        description: "Java file to run"
+      code:
+        description: "Java source code"
         required: true
-        type: string
       input:
         description: "Program input"
         required: false
-        type: string
 
 permissions:
   contents: write
@@ -20,42 +18,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           persist-credentials: true
           fetch-depth: 0
 
-      # create stdin.txt from website input
+      # Create Java file dynamically from browser
+      - name: Create Main.java
+        run: |
+          printf "%s" "${{ github.event.inputs.code }}" > Main.java
+
+      # Create stdin
       - name: Prepare input
         run: |
-          printf "%b" "${{ github.event.inputs.input }}" > stdin.txt
+          printf "%s" "${{ github.event.inputs.input }}" > stdin.txt
 
-      # compile all java files and capture errors
-      - name: Compile Java
+      # Compile
+      - name: Compile program
         run: |
-          javac -encoding UTF-8 $(find . -name "*.java") 2> compile_error.txt || true
+          javac Main.java 2> compile_error.txt || true
 
-      # run program OR show compile error
-      - name: Execute program
+      # If compile error -> return error
+      - name: Handle compile error
         run: |
-          FILE="${{ github.event.inputs.filename }}"
-          CLASS=$(basename "$FILE" .java)
-          RUNID=${{ github.run_id }}
-
           if [ -s compile_error.txt ]; then
-            echo "----- COMPILATION ERROR -----" > output_$RUNID.txt
-            cat compile_error.txt >> output_$RUNID.txt
-          else
-            timeout 20 java -cp . $CLASS < stdin.txt > output_$RUNID.txt 2>&1 || echo "Program terminated (timeout or runtime error)" >> output_$RUNID.txt
+            cp compile_error.txt output_${{ github.run_id }}.txt
+            exit 0
           fi
 
-      # push output back to repository so website can read it
+      # Run program
+      - name: Run program
+        run: |
+          java Main < stdin.txt > output_${{ github.run_id }}.txt 2>&1
+
+      # Push output so website can read it
       - name: Upload output
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add output_${{ github.run_id }}.txt
-          git commit -m "program output ${{ github.run_id }}" || echo "no change"
+          git commit -m "run ${{ github.run_id }}" || echo "no change"
           git push
