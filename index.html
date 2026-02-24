@@ -92,11 +92,13 @@ button:hover{background:#333}
 <script>
 
 const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
+
 const term=document.getElementById("console");
 const codeBox=document.getElementById("code");
 
 let busy=false;
 let selectedProgram=null;
+let lastPrompts=[];
 
 let currentLine="";
 let lines=[];
@@ -107,7 +109,7 @@ function write(t){
   term.scrollTop=term.scrollHeight;
 }
 
-/* detect how many inputs program needs */
+/* detect input count */
 function countInputs(code){
   const patterns=[
     "nextInt(",
@@ -125,27 +127,43 @@ function countInputs(code){
 
   return count;
 }
-  function extractPrompts(code){
+
+/* extract real prompts from java */
+function extractPrompts(code){
 
   const prompts=[];
   const regex=/System\.out\.print(?:ln)?\s*\(\s*"(.*?)"\s*\)/g;
 
   let match;
-
   while((match=regex.exec(code))!==null){
     prompts.push(match[1]);
   }
-
   return prompts;
+}
+
+/* remove prompts from output */
+function cleanOutput(output, prompts){
+
+  let cleaned=output;
+
+  for(let p of prompts){
+    const escaped=p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const regex=new RegExp(escaped,"g");
+    cleaned=cleaned.replace(regex,"");
+  }
+
+  return cleaned.trim();
 }
 
 /* load java files */
 async function loadPrograms(){
+
   const r=await fetch(API+"/files");
   const files=await r.json();
   const box=document.getElementById("programs");
 
   files.forEach(f=>{
+
     const b=document.createElement("button");
     b.textContent=f;
 
@@ -158,56 +176,35 @@ async function loadPrograms(){
       const code=await r2.text();
       codeBox.textContent=code;
 
-      /* AUTO INPUT DETECTION */
-      const totalInputs=countInputs(code);
-/* extract real prompts from java code */
-const prompts = extractPrompts(code);
-let collected=[];
+      /* get prompts */
+      const prompts=extractPrompts(code);
+      lastPrompts=prompts;
 
-if(prompts.length>0){
+      let collected=[];
 
-  for(let p of prompts){
+      if(prompts.length>0){
 
-    // remove trailing spaces
-    let clean=p.trim();
+        for(let p of prompts){
+          const val=prompt(p.trim());
+          collected.push(val??"");
+        }
 
-    // show real message
-    const val = prompt(clean);
-    collected.push(val ?? "");
-  }
+      }else{
 
-}
-else{
-  // fallback if no print statements
-  const totalInputs=countInputs(code);
-  for(let i=1;i<=totalInputs;i++){
-    const val=prompt("Enter input value "+i+":");
-    collected.push(val??"");
-  }
-}
-      function cleanOutput(output, prompts){
+        const totalInputs=countInputs(code);
 
-  let cleaned=output;
-
-  for(let p of prompts){
-    // remove occurrences of prompts in output
-    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escaped, 'g');
-    cleaned = cleaned.replace(regex,'');
-  }
-
-  return cleaned.trim();
-}
-
-lines=collected;
+        for(let i=1;i<=totalInputs;i++){
+          const val=prompt("Enter input value "+i+":");
+          collected.push(val??"");
+        }
+      }
 
       lines=collected;
 
       /* reset console */
       term.textContent="";
       write("Selected: "+f+"\n");
-      write("Inputs captured. Press ENTER to run.\n");
-      write("SHIFT+ENTER → add extra manual line\n\n> ");
+      write("Inputs captured. Press ENTER to run.\n\n> ");
       term.focus();
     };
 
@@ -215,7 +212,7 @@ lines=collected;
   });
 }
 
-/* keyboard terminal */
+/* terminal keyboard */
 term.addEventListener("keydown",async(e)=>{
 
   if(!selectedProgram || busy) return;
@@ -259,7 +256,6 @@ term.addEventListener("keydown",async(e)=>{
       write("status: "+status+"\n");
     }
 
-    /* fetch output safely */
     write("\nFetching output...\n");
 
     let output="waiting...";
@@ -275,6 +271,9 @@ term.addEventListener("keydown",async(e)=>{
 
       tries++;
     }
+
+    /* CLEAN PROMPTS */
+    output=cleanOutput(output,lastPrompts);
 
     write("\n----- PROGRAM OUTPUT -----\n");
     write(output+"\n\n> ");
@@ -295,7 +294,7 @@ term.addEventListener("keydown",async(e)=>{
     return;
   }
 
-  /* NORMAL TYPING */
+  /* typing */
   if(e.key.length===1){
     currentLine+=e.key;
     write(e.key);
