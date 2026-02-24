@@ -51,6 +51,30 @@ button{
 }
 button:hover{background:#1c1c1c}
 
+/* manual input box */
+#manualInput{
+  width:100%;
+  height:120px;
+  background:black;
+  color:#00ffa2;
+  border:none;
+  border-top:2px solid #00ffa2;
+  padding:10px;
+  font-family:Consolas,monospace;
+  resize:none;
+  outline:none;
+}
+
+/* run button */
+#runBtn{
+  background:#003b2b;
+  border:none;
+  color:#00ffa2;
+  padding:10px;
+  font-weight:bold;
+}
+#runBtn:hover{background:#005f45}
+
 #term{
   flex:1;
   padding:12px;
@@ -71,6 +95,16 @@ button:hover{background:#1c1c1c}
 
   <div id="right">
     <div id="programs"></div>
+
+    <textarea id="manualInput" placeholder="Optional input (for args[] or competitive programs)
+Example:
+5 10
+or
+3
+1 2 3"></textarea>
+
+    <button id="runBtn">RUN</button>
+
     <div id="term"></div>
   </div>
 </div>
@@ -78,16 +112,22 @@ button:hover{background:#1c1c1c}
 <script>
 
 const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
+
 const term=document.getElementById("term");
 const code=document.getElementById("code");
 const programs=document.getElementById("programs");
+const manualInput=document.getElementById("manualInput");
+const runBtn=document.getElementById("runBtn");
+
+let selectedFile=null;
+let lastPrompts=[];
 
 function write(t){
   term.textContent+=t;
   term.scrollTop=term.scrollHeight;
 }
 
-/* ---------------- EXTRACT PROMPTS FROM JAVA ---------------- */
+/* -------- PROMPT DETECTOR -------- */
 function extractPrompts(code){
   const prompts=[];
   const regex=/System\.out\.print(?:ln)?\s*\(\s*"(.*?)"\s*\)/g;
@@ -95,94 +135,94 @@ function extractPrompts(code){
   let match;
   while((match=regex.exec(code))!==null){
     const text=match[1].trim();
-    if(text.length>0)
-      prompts.push(text);
+    if(text.length>0) prompts.push(text);
   }
-
   return prompts;
 }
 
-/* ---------------- REMOVE PROMPTS FROM OUTPUT ---------------- */
-function cleanOutput(output, prompts){
+/* -------- CLEAN OUTPUT -------- */
+function cleanOutput(output,prompts){
 
   let cleaned=output;
 
-  // remove RUN: footer
+  // remove github footer
   cleaned=cleaned.replace(/RUN:\d+/g,"");
 
-  // remove prompts printed by Java
+  // remove printed prompts
   for(const p of prompts){
     const escaped=p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
     const regex=new RegExp(escaped,"g");
     cleaned=cleaned.replace(regex,"");
   }
 
-  // remove extra spaces/newlines
-  cleaned=cleaned.replace(/\n\s*\n/g,"\n").trim();
-
-  return cleaned;
+  return cleaned.trim();
 }
 
-/* ---------------- LOAD PROGRAM LIST ---------------- */
+/* -------- LOAD FILES -------- */
 async function loadPrograms(){
 
   const r=await fetch(API+"/files");
-  if(!r.ok){
-    code.textContent="Worker unreachable.";
-    return;
-  }
-
   const files=await r.json();
+
   programs.innerHTML="";
 
   files.forEach(f=>{
     const b=document.createElement("button");
     b.textContent=f;
-    b.onclick=()=>runProgram(f);
+
+    b.onclick=async ()=>{
+      selectedFile=f;
+      term.textContent="";
+      write("Loading "+f+"...\n");
+
+      const r2=await fetch(API+"/code?file="+encodeURIComponent(f));
+      const src=await r2.text();
+      code.textContent=src;
+
+      lastPrompts=extractPrompts(src);
+
+      if(lastPrompts.length>0)
+        write("Program requires interactive input.\n");
+      else
+        write("Paste input in the box and press RUN.\n");
+    };
+
     programs.appendChild(b);
   });
 
   code.textContent="Select a program from the right.";
 }
 
-/* ---------------- RUN PROGRAM ---------------- */
-async function runProgram(file){
+/* -------- RUN PROGRAM -------- */
+runBtn.onclick=async function(){
 
-  term.textContent="";
-  write("Fetching code...\n");
-
-  const r=await fetch(API+"/code?file="+encodeURIComponent(file));
-  const src=await r.text();
-  code.textContent=src;
+  if(!selectedFile){
+    alert("Select a program first");
+    return;
+  }
 
   let inputs=[];
-  const prompts=extractPrompts(src);
 
-  /* If program contains prompts, use them */
-  if(prompts.length>0){
-    for(const p of prompts){
-      const val=prompt(p.trim()) ?? "";
+  /* If prompts exist → popup input */
+  if(lastPrompts.length>0){
+    for(const p of lastPrompts){
+      const val=prompt(p) ?? "";
       inputs.push(val);
     }
   }
   else{
-    // fallback for programs without prints
-    const matches = src.match(/next(Int|Line|Double|Float|Long|Short|Byte)\s*\(/g);
-    const count = matches ? matches.length : 0;
-
-    for(let i=1;i<=count;i++){
-      const val=prompt("Enter input "+i+":") ?? "";
-      inputs.push(val);
-    }
+    // manual input box
+    inputs=manualInput.value.split("\n");
   }
 
+  term.textContent="";
   write("Starting execution...\n");
 
   const start=await fetch(API+"/run",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      filename:file,
+      filename:selectedFile,
       input:inputs.join("\n")
     })
   });
@@ -190,7 +230,6 @@ async function runProgram(file){
   const runid=await start.text();
   write("Run ID: "+runid+"\n");
 
-  /* wait for runner */
   let done=false;
   while(!done){
     await new Promise(r=>setTimeout(r,4000));
@@ -198,14 +237,7 @@ async function runProgram(file){
     const js=await s.json();
 
     write("status: "+js.status+"\n");
-
-    if(js.conclusion==="failure"){
-      write("\nProgram failed.\n");
-      return;
-    }
-
-    if(js.status==="completed")
-      done=true;
+    if(js.status==="completed") done=true;
   }
 
   write("\nFetching output...\n");
@@ -217,14 +249,14 @@ async function runProgram(file){
     output=await out.text();
   }
 
-  /* CLEAN OUTPUT HERE */
-  output=cleanOutput(output,prompts);
+  output=cleanOutput(output,lastPrompts);
 
   write("\n------ OUTPUT ------\n");
   write(output+"\n");
-}
+};
 
 loadPrograms();
+
 </script>
 </body>
 </html>
