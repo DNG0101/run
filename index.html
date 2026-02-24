@@ -185,6 +185,19 @@ else{
     collected.push(val??"");
   }
 }
+      function cleanOutput(output, prompts){
+
+  let cleaned=output;
+
+  for(let p of prompts){
+    // remove occurrences of prompts in output
+    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'g');
+    cleaned = cleaned.replace(regex,'');
+  }
+
+  return cleaned.trim();
+}
 
 lines=collected;
 
