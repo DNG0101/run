@@ -1,0 +1,2 @@
+Enter first number: Enter second number: Enter third number: Total Sum = 270
+RUN:22340136342
