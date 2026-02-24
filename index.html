@@ -87,19 +87,45 @@ function write(t){
   term.scrollTop=term.scrollHeight;
 }
 
+/* ---------------- EXTRACT PROMPTS FROM JAVA ---------------- */
 function extractPrompts(code){
-
   const prompts=[];
   const regex=/System\.out\.print(?:ln)?\s*\(\s*"(.*?)"\s*\)/g;
 
   let match;
   while((match=regex.exec(code))!==null){
-    prompts.push(match[1]);
+    const text=match[1].trim();
+    if(text.length>0)
+      prompts.push(text);
   }
 
   return prompts;
 }
+
+/* ---------------- REMOVE PROMPTS FROM OUTPUT ---------------- */
+function cleanOutput(output, prompts){
+
+  let cleaned=output;
+
+  // remove RUN: footer
+  cleaned=cleaned.replace(/RUN:\d+/g,"");
+
+  // remove prompts printed by Java
+  for(const p of prompts){
+    const escaped=p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const regex=new RegExp(escaped,"g");
+    cleaned=cleaned.replace(regex,"");
+  }
+
+  // remove extra spaces/newlines
+  cleaned=cleaned.replace(/\n\s*\n/g,"\n").trim();
+
+  return cleaned;
+}
+
+/* ---------------- LOAD PROGRAM LIST ---------------- */
 async function loadPrograms(){
+
   const r=await fetch(API+"/files");
   if(!r.ok){
     code.textContent="Worker unreachable.";
@@ -119,6 +145,7 @@ async function loadPrograms(){
   code.textContent="Select a program from the right.";
 }
 
+/* ---------------- RUN PROGRAM ---------------- */
 async function runProgram(file){
 
   term.textContent="";
@@ -128,29 +155,26 @@ async function runProgram(file){
   const src=await r.text();
   code.textContent=src;
 
-let inputs=[];
-const prompts=extractPrompts(src);
+  let inputs=[];
+  const prompts=extractPrompts(src);
 
-/* If program contains prompts, use them */
-if(prompts.length>0){
-
-  for(const p of prompts){
-    const val=prompt(p.trim()) ?? "";
-    inputs.push(val);
+  /* If program contains prompts, use them */
+  if(prompts.length>0){
+    for(const p of prompts){
+      const val=prompt(p.trim()) ?? "";
+      inputs.push(val);
+    }
   }
+  else{
+    // fallback for programs without prints
+    const matches = src.match(/next(Int|Line|Double|Float|Long|Short|Byte)\s*\(/g);
+    const count = matches ? matches.length : 0;
 
-}
-/* If program has Scanner but no prints */
-else{
-
-  const matches = src.match(/next(Int|Line|Double|Float|Long|Short|Byte)\s*\(/g);
-  const count = matches ? matches.length : 0;
-
-  for(let i=1;i<=count;i++){
-    const val=prompt("Enter input "+i+":") ?? "";
-    inputs.push(val);
+    for(let i=1;i<=count;i++){
+      const val=prompt("Enter input "+i+":") ?? "";
+      inputs.push(val);
+    }
   }
-}
 
   write("Starting execution...\n");
 
@@ -192,6 +216,9 @@ else{
     const out=await fetch(API+"/result?id="+runid);
     output=await out.text();
   }
+
+  /* CLEAN OUTPUT HERE */
+  output=cleanOutput(output,prompts);
 
   write("\n------ OUTPUT ------\n");
   write(output+"\n");
