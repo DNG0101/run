@@ -18,7 +18,7 @@ body{
   height:100vh;
 }
 
-/* LEFT: code viewer */
+/* LEFT PANEL */
 #codePanel{
   width:50%;
   border-right:2px solid #0f0;
@@ -33,13 +33,30 @@ body{
   color:#00ffaa;
 }
 
+/* code viewer */
 #code{
   white-space:pre;
   text-align:left;
   color:#00eaff;
 }
 
-/* RIGHT: terminal */
+/* editor */
+#editor{
+  display:none;
+  width:100%;
+  height:85%;
+  background:#0b0b0b;
+  color:#00eaff;
+  border:2px solid #0f0;
+  resize:none;
+  outline:none;
+  padding:12px;
+  font-family:Consolas,monospace;
+  font-size:14px;
+  line-height:1.4;
+}
+
+/* RIGHT PANEL */
 #rightPanel{
   width:50%;
   display:flex;
@@ -51,6 +68,7 @@ body{
   border-bottom:2px solid #0f0;
 }
 
+/* buttons */
 button{
   padding:8px 14px;
   margin:4px;
@@ -62,6 +80,7 @@ button{
 }
 button:hover{background:#333}
 
+/* terminal */
 #console{
   flex:1;
   padding:15px;
@@ -70,6 +89,13 @@ button:hover{background:#333}
   white-space:pre-wrap;
   outline:none;
 }
+
+/* blinking cursor */
+.cursor::after{
+  content:"█";
+  animation:blink 1s infinite;
+}
+@keyframes blink{50%{opacity:0;}}
 </style>
 </head>
 
@@ -77,11 +103,22 @@ button:hover{background:#333}
 
 <div id="container">
 
+  <!-- LEFT -->
   <div id="codePanel">
-    <h3>Program Code</h3>
+    <h3>Program Code / Editor</h3>
+
+    <div>
+      <button onclick="enableEditor()">✏ Write Code</button>
+      <button onclick="runTypedCode()">▶ Run Written Code</button>
+      <button onclick="clearConsole()">🧹 Clear Console</button>
+      <button onclick="downloadOutput()">⬇ Download Output</button>
+    </div>
+
+    <textarea id="editor"></textarea>
     <pre id="code">Select a program...</pre>
   </div>
 
+  <!-- RIGHT -->
   <div id="rightPanel">
     <div id="programs"></div>
     <div id="console" tabindex="0"></div>
@@ -95,6 +132,7 @@ const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
 
 const term=document.getElementById("console");
 const codeBox=document.getElementById("code");
+const editor=document.getElementById("editor");
 
 let busy=false;
 let selectedProgram=null;
@@ -103,37 +141,24 @@ let lastPrompts=[];
 let currentLine="";
 let lines=[];
 
-/* write to terminal */
+/* terminal output */
 function write(t){
   term.textContent+=t;
   term.scrollTop=term.scrollHeight;
 }
 
-/* detect input count */
+/* detect inputs */
 function countInputs(code){
-  const patterns=[
-    "nextInt(",
-    "nextLine(",
-    "nextDouble(",
-    "nextFloat(",
-    "next(",
-    "nextLong("
-  ];
-
+  const patterns=["nextInt(","nextLine(","nextDouble(","nextFloat(","next(","nextLong("];
   let count=0;
-  patterns.forEach(p=>{
-    count+=code.split(p).length-1;
-  });
-
+  patterns.forEach(p=>count+=code.split(p).length-1);
   return count;
 }
 
-/* extract real prompts from java */
+/* extract prompts */
 function extractPrompts(code){
-
   const prompts=[];
   const regex=/System\.out\.print(?:ln)?\s*\(\s*"(.*?)"\s*\)/g;
-
   let match;
   while((match=regex.exec(code))!==null){
     prompts.push(match[1]);
@@ -142,20 +167,17 @@ function extractPrompts(code){
 }
 
 /* remove prompts from output */
-function cleanOutput(output, prompts){
-
+function cleanOutput(output,prompts){
   let cleaned=output;
-
   for(let p of prompts){
     const escaped=p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
     const regex=new RegExp(escaped,"g");
     cleaned=cleaned.replace(regex,"");
   }
-
   return cleaned.trim();
 }
 
-/* load java files */
+/* load .java files */
 async function loadPrograms(){
 
   const r=await fetch(API+"/files");
@@ -163,37 +185,31 @@ async function loadPrograms(){
   const box=document.getElementById("programs");
 
   files.forEach(f=>{
-
     const b=document.createElement("button");
     b.textContent=f;
 
     b.onclick=async ()=>{
-
       selectedProgram=f;
+      editor.style.display="none";
+      codeBox.style.display="block";
 
-      /* load source code */
       const r2=await fetch(API+"/code?file="+f);
       const code=await r2.text();
       codeBox.textContent=code;
 
-      /* get prompts */
       const prompts=extractPrompts(code);
       lastPrompts=prompts;
 
       let collected=[];
 
       if(prompts.length>0){
-
         for(let p of prompts){
           const val=prompt(p.trim());
           collected.push(val??"");
         }
-
       }else{
-
-        const totalInputs=countInputs(code);
-
-        for(let i=1;i<=totalInputs;i++){
+        const total=countInputs(code);
+        for(let i=1;i<=total;i++){
           const val=prompt("Enter input value "+i+":");
           collected.push(val??"");
         }
@@ -201,10 +217,8 @@ async function loadPrograms(){
 
       lines=collected;
 
-      /* reset console */
       term.textContent="";
-      write("Selected: "+f+"\n");
-      write("Inputs captured. Press ENTER to run.\n\n> ");
+      write("Selected: "+f+"\nInputs captured. Press ENTER to run.\n\n> ");
       term.focus();
     };
 
@@ -212,12 +226,11 @@ async function loadPrograms(){
   });
 }
 
-/* terminal keyboard */
+/* terminal keyboard execution (existing system) */
 term.addEventListener("keydown",async(e)=>{
 
   if(!selectedProgram || busy) return;
 
-  /* SHIFT+ENTER new line */
   if(e.key==="Enter" && e.shiftKey){
     e.preventDefault();
     lines.push(currentLine);
@@ -226,7 +239,6 @@ term.addEventListener("keydown",async(e)=>{
     return;
   }
 
-  /* ENTER run */
   if(e.key==="Enter"){
     e.preventDefault();
 
@@ -239,15 +251,11 @@ term.addEventListener("keydown",async(e)=>{
     const r=await fetch(API+"/run",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        filename:selectedProgram,
-        input:fullInput
-      })
+      body:JSON.stringify({filename:selectedProgram,input:fullInput})
     });
 
     const runid=await r.text();
 
-    /* wait runner */
     let status="queued";
     while(status!=="completed"){
       await new Promise(r=>setTimeout(r,5000));
@@ -259,20 +267,12 @@ term.addEventListener("keydown",async(e)=>{
     write("\nFetching output...\n");
 
     let output="waiting...";
-    let tries=0;
-
-    while(tries<20){
+    while(output==="waiting..."){
       await new Promise(r=>setTimeout(r,3000));
       const out=await fetch(API+"/result?id="+runid);
       output=await out.text();
-
-      if(output!=="waiting..." && output.trim()!=="")
-        break;
-
-      tries++;
     }
 
-    /* CLEAN PROMPTS */
     output=cleanOutput(output,lastPrompts);
 
     write("\n----- PROGRAM OUTPUT -----\n");
@@ -281,10 +281,8 @@ term.addEventListener("keydown",async(e)=>{
     currentLine="";
     lines=[];
     busy=false;
-    return;
   }
 
-  /* BACKSPACE */
   if(e.key==="Backspace"){
     e.preventDefault();
     if(currentLine.length>0){
@@ -294,12 +292,95 @@ term.addEventListener("keydown",async(e)=>{
     return;
   }
 
-  /* typing */
   if(e.key.length===1){
     currentLine+=e.key;
     write(e.key);
   }
 });
+
+/* enable custom code editor */
+function enableEditor(){
+  codeBox.style.display="none";
+  editor.style.display="block";
+
+  if(!editor.value.trim()){
+    editor.value=
+`import java.util.*;
+
+public class Main {
+    public static void main(String[] args){
+
+        Scanner sc=new Scanner(System.in);
+
+        System.out.print("Enter number: ");
+        int n=sc.nextInt();
+
+        System.out.println("Square = "+(n*n));
+    }
+}`;
+  }
+}
+
+/* run written code */
+async function runTypedCode(){
+
+  if(busy) return;
+
+  const code=editor.value;
+  if(!code.trim()){
+    alert("Write Java code first");
+    return;
+  }
+
+  const input=prompt("Enter input (use \\n for multiple lines):")||"";
+
+  term.textContent="";
+  write("Running custom code...\n");
+  busy=true;
+
+  const r=await fetch(API+"/run",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({code:code,input:input,custom:true})
+  });
+
+  const runid=await r.text();
+
+  let status="queued";
+  while(status!=="completed"){
+    await new Promise(r=>setTimeout(r,5000));
+    const s=await fetch(API+"/status?id="+runid);
+    status=await s.text();
+    write("status: "+status+"\n");
+  }
+
+  write("\nFetching output...\n");
+
+  let output="waiting...";
+  while(output==="waiting..."){
+    await new Promise(r=>setTimeout(r,3000));
+    const out=await fetch(API+"/result?id="+runid);
+    output=await out.text();
+  }
+
+  write("\n----- PROGRAM OUTPUT -----\n");
+  write(output+"\n> ");
+
+  busy=false;
+}
+
+/* utilities */
+function clearConsole(){
+  term.textContent="";
+}
+
+function downloadOutput(){
+  const blob=new Blob([term.textContent],{type:"text/plain"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="output.txt";
+  a.click();
+}
 
 loadPrograms();
 
