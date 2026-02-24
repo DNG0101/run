@@ -18,7 +18,7 @@ body{
   height:100vh;
 }
 
-/* LEFT: code panel */
+/* LEFT: code viewer */
 #codePanel{
   width:50%;
   border-right:2px solid #0f0;
@@ -39,14 +39,13 @@ body{
   color:#00eaff;
 }
 
-/* RIGHT: console panel */
+/* RIGHT: terminal */
 #rightPanel{
   width:50%;
   display:flex;
   flex-direction:column;
 }
 
-/* program buttons */
 #programs{
   padding:10px;
   border-bottom:2px solid #0f0;
@@ -63,7 +62,6 @@ button{
 }
 button:hover{background:#333}
 
-/* terminal */
 #console{
   flex:1;
   padding:15px;
@@ -79,13 +77,11 @@ button:hover{background:#333}
 
 <div id="container">
 
-  <!-- LEFT SIDE -->
   <div id="codePanel">
     <h3>Program Code</h3>
     <pre id="code">Select a program...</pre>
   </div>
 
-  <!-- RIGHT SIDE -->
   <div id="rightPanel">
     <div id="programs"></div>
     <div id="console" tabindex="0"></div>
@@ -105,12 +101,32 @@ let selectedProgram=null;
 let currentLine="";
 let lines=[];
 
+/* write to terminal */
 function write(t){
   term.textContent+=t;
   term.scrollTop=term.scrollHeight;
 }
 
-/* LOAD JAVA FILE LIST */
+/* detect how many inputs program needs */
+function countInputs(code){
+  const patterns=[
+    "nextInt(",
+    "nextLine(",
+    "nextDouble(",
+    "nextFloat(",
+    "next(",
+    "nextLong("
+  ];
+
+  let count=0;
+  patterns.forEach(p=>{
+    count+=code.split(p).length-1;
+  });
+
+  return count;
+}
+
+/* load java files */
 async function loadPrograms(){
   const r=await fetch(API+"/files");
   const files=await r.json();
@@ -120,46 +136,33 @@ async function loadPrograms(){
     const b=document.createElement("button");
     b.textContent=f;
 
-   b.onclick=async ()=>{
+    b.onclick=async ()=>{
 
-  selectedProgram=f;
-
-  // load code
-  const r2=await fetch(API+"/code?file="+f);
-  const code=await r2.text();
-  codeBox.textContent=code;
-
-  // detect required inputs
-  const totalInputs = countInputs(code);
-
-  let collected=[];
-
-  if(totalInputs>0){
-    for(let i=1;i<=totalInputs;i++){
-      const val = prompt("Enter input value "+i+":");
-      collected.push(val ?? "");
-    }
-  }
-
-  // prepare staged input
-  lines = collected;
-
-  term.textContent="";
-  write("Selected: "+f+"\n");
-  write("Inputs captured. Press ENTER to run.\n\n> ");
-  term.focus();
-};
       selectedProgram=f;
 
-      /* load code */
+      /* load source code */
       const r2=await fetch(API+"/code?file="+f);
-      const text=await r2.text();
-      codeBox.textContent=text;
+      const code=await r2.text();
+      codeBox.textContent=code;
 
-      /* reset terminal */
+      /* AUTO INPUT DETECTION */
+      const totalInputs=countInputs(code);
+      let collected=[];
+
+      if(totalInputs>0){
+        for(let i=1;i<=totalInputs;i++){
+          const val=prompt("Enter input value "+i+":");
+          collected.push(val??"");
+        }
+      }
+
+      lines=collected;
+
+      /* reset console */
       term.textContent="";
       write("Selected: "+f+"\n");
-      write("SHIFT+ENTER → next input line\nENTER → run program\n\n> ");
+      write("Inputs captured. Press ENTER to run.\n");
+      write("SHIFT+ENTER → add extra manual line\n\n> ");
       term.focus();
     };
 
@@ -167,12 +170,12 @@ async function loadPrograms(){
   });
 }
 
-/* TERMINAL INPUT HANDLING */
+/* keyboard terminal */
 term.addEventListener("keydown",async(e)=>{
 
   if(!selectedProgram || busy) return;
 
-  /* SHIFT+ENTER = new line input */
+  /* SHIFT+ENTER new line */
   if(e.key==="Enter" && e.shiftKey){
     e.preventDefault();
     lines.push(currentLine);
@@ -181,7 +184,7 @@ term.addEventListener("keydown",async(e)=>{
     return;
   }
 
-  /* ENTER = run */
+  /* ENTER run */
   if(e.key==="Enter"){
     e.preventDefault();
 
@@ -202,7 +205,7 @@ term.addEventListener("keydown",async(e)=>{
 
     const runid=await r.text();
 
-    /* wait for execution */
+    /* wait runner */
     let status="queued";
     while(status!=="completed"){
       await new Promise(r=>setTimeout(r,5000));
@@ -211,7 +214,7 @@ term.addEventListener("keydown",async(e)=>{
       write("status: "+status+"\n");
     }
 
-    /* fetch output (GitHub cache delay safe) */
+    /* fetch output safely */
     write("\nFetching output...\n");
 
     let output="waiting...";
@@ -255,25 +258,6 @@ term.addEventListener("keydown",async(e)=>{
 });
 
 loadPrograms();
-  function countInputs(code){
-  const patterns = [
-    "nextInt(",
-    "nextLine(",
-    "nextDouble(",
-    "nextFloat(",
-    "next(",
-    "nextLong("
-  ];
-
-  let count=0;
-
-  patterns.forEach(p=>{
-    const matches = code.split(p).length-1;
-    count+=matches;
-  });
-
-  return count;
-}
 
 </script>
 </body>
