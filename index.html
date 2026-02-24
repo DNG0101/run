@@ -12,27 +12,28 @@ body{
   font-family:Consolas,monospace;
 }
 
+/* Layout */
 #layout{
   display:flex;
   height:100vh;
 }
 
-/* LEFT */
+/* LEFT PANEL (CODE VIEW) */
 #left{
   width:50%;
   border-right:2px solid #00ff9c;
   padding:12px;
   box-sizing:border-box;
+  overflow:auto;
 }
 
 #code{
   white-space:pre;
-  height:90%;
-  overflow:auto;
   color:#00eaff;
+  font-size:14px;
 }
 
-/* RIGHT */
+/* RIGHT PANEL */
 #right{
   width:50%;
   display:flex;
@@ -44,24 +45,35 @@ body{
   padding:10px;
 }
 
+/* Buttons */
 button{
-  padding:6px 12px;
+  padding:7px 14px;
   margin:4px;
-  background:#111;
+  background:#101010;
   color:#00ff9c;
   border:1px solid #00ff9c;
   cursor:pointer;
 }
-button:hover{background:#1c1c1c}
+button:hover{
+  background:#1c1c1c;
+}
 
-/* terminal */
+/* Terminal */
 #term{
   flex:1;
   background:black;
-  padding:12px;
+  padding:14px;
   overflow:auto;
   white-space:pre-wrap;
+  outline:none;
 }
+
+/* Cursor effect */
+.cursor::after{
+  content:"█";
+  animation:blink 1s infinite;
+}
+@keyframes blink{50%{opacity:0}}
 </style>
 </head>
 
@@ -69,11 +81,13 @@ button:hover{background:#1c1c1c}
 
 <div id="layout">
 
+  <!-- LEFT SIDE -->
   <div id="left">
     <h3>Java Source</h3>
-    <pre id="code">Loading programs...</pre>
+    <pre id="code">Connecting to server...</pre>
   </div>
 
+  <!-- RIGHT SIDE -->
   <div id="right">
     <div id="programs"></div>
     <div id="term" tabindex="0"></div>
@@ -83,54 +97,72 @@ button:hover{background:#1c1c1c}
 
 <script>
 
+/* CHANGE ONLY IF WORKER URL CHANGES */
 const API="https://throbbing-glitter-9b1e.donthulanithish53.workers.dev";
 
 const term=document.getElementById("term");
 const code=document.getElementById("code");
+const programBox=document.getElementById("programs");
 
-function write(t){
-  term.textContent+=t;
+/* terminal output */
+function write(text){
+  term.textContent+=text;
   term.scrollTop=term.scrollHeight;
 }
 
-async function loadPrograms(){
-
-  const r=await fetch(API+"/files");
-  if(!r.ok){
-    code.textContent="Server unreachable";
-    return;
-  }
-
-  const files=await r.json();
-  const box=document.getElementById("programs");
-  box.innerHTML="";
-
-  files.forEach(f=>{
-    const b=document.createElement("button");
-    b.textContent=f;
-
-    b.onclick=()=>runProgram(f);
-    box.appendChild(b);
-  });
-
-  code.textContent="Select a program to view and run.";
+/* detect Scanner inputs automatically */
+function detectInputs(src){
+  const matches=src.match(/next(Int|Line|Double|Float|Long|Short|Byte)\s*\(/g);
+  return matches?matches.length:0;
 }
 
+/* load program list */
+async function loadPrograms(){
+
+  try{
+    const r=await fetch(API+"/files");
+
+    if(!r.ok){
+      code.textContent="Cannot connect to worker server.";
+      return;
+    }
+
+    const files=await r.json();
+
+    programBox.innerHTML="";
+
+    files.forEach(file=>{
+      const btn=document.createElement("button");
+      btn.textContent=file;
+      btn.onclick=()=>runProgram(file);
+      programBox.appendChild(btn);
+    });
+
+    code.textContent="Select a program from the right panel.";
+  }
+  catch(e){
+    code.textContent="Worker server offline.";
+  }
+}
+
+/* run a selected java program */
 async function runProgram(file){
 
   term.textContent="";
   write("Fetching code...\n");
 
-  const r=await fetch(API+"/code?file="+file);
+  /* get code */
+  const r=await fetch(API+"/code?file="+encodeURIComponent(file));
   const src=await r.text();
+
   code.textContent=src;
 
-  /* collect inputs automatically */
-  const inputCount=(src.match(/next(Int|Line|Double|Float|Long|)/g)||[]).length;
-
+  /* collect inputs */
+  const inputCount=detectInputs(src);
   let inputs=[];
+
   for(let i=1;i<=inputCount;i++){
-    const val=prompt("Input "+i+":")||"";
+    const val=prompt("Enter input "+i+":") ?? "";
     inputs.push(val);
   }
 
@@ -138,19 +170,24 @@ async function runProgram(file){
 
   write("Starting execution...\n");
 
+  /* start runner */
   const run=await fetch(API+"/run",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({filename:file,input:fullInput})
+    body:JSON.stringify({
+      filename:file,
+      input:fullInput
+    })
   });
 
   const runid=await run.text();
   write("Run ID: "+runid+"\n");
 
   /* status polling */
-  let completed=false;
+  let finished=false;
 
-  while(!completed){
+  while(!finished){
+
     await new Promise(r=>setTimeout(r,4000));
 
     const s=await fetch(API+"/status?id="+runid);
@@ -159,17 +196,19 @@ async function runProgram(file){
     write("status: "+js.status+"\n");
 
     if(js.conclusion==="failure"){
-      write("Program failed (compile/runtime error)\n");
+      write("\nProgram failed (compile/runtime error)\n");
       return;
     }
 
     if(js.status==="completed")
-      completed=true;
+      finished=true;
   }
 
+  /* fetch output */
   write("\nFetching output...\n");
 
   let output="waiting";
+
   while(output==="waiting"){
     await new Promise(r=>setTimeout(r,3000));
     const out=await fetch(API+"/result?id="+runid);
@@ -180,6 +219,7 @@ async function runProgram(file){
   write(output+"\n");
 }
 
+/* start page */
 loadPrograms();
 
 </script>
