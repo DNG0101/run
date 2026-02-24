@@ -125,6 +125,19 @@ function countInputs(code){
 
   return count;
 }
+  function extractPrompts(code){
+
+  const prompts=[];
+  const regex=/System\.out\.print(?:ln)?\s*\(\s*"(.*?)"\s*\)/g;
+
+  let match;
+
+  while((match=regex.exec(code))!==null){
+    prompts.push(match[1]);
+  }
+
+  return prompts;
+}
 
 /* load java files */
 async function loadPrograms(){
