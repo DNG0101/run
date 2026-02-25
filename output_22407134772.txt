@@ -1,0 +1,2 @@
+Enter first number: Enter second number: Enter third number: Total Sum = 180
+RUN:22407134772
