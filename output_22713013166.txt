@@ -1,0 +1,6 @@
+Enter first number: Enter second number: Enter third number: Exception in thread "main" java.util.InputMismatchException: For input string: "516515156165165165321151561515200"
+	at java.base/java.util.Scanner.nextInt(Scanner.java:2264)
+	at java.base/java.util.Scanner.nextInt(Scanner.java:2212)
+	at AddThree.main(AddThree.java:15)
+Runtime error
+RUN:22713013166
